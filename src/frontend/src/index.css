@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("/assets/fonts/PlusJakartaSans.woff2") format("woff2");
+  font-weight: 300 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Bricolage Grotesque";
+  src: url("/assets/fonts/BricolageGrotesque.woff2") format("woff2");
+  font-weight: 200 800;
+  font-display: swap;
+}
+
+@layer base {
+  :root {
+    --radius: 0.625rem;
+
+    /* Light mode — Hidestay brand: slate/blue */
+    --background: 0.985 0.003 247.858; /* #F8FAFC very light blue-gray */
+    --foreground: 0.15 0.02 264; /* #0F172A near-black slate */
+    --card: 1 0 0; /* #FFFFFF */
+    --card-foreground: 0.15 0.02 264;
+    --popover: 1 0 0;
+    --popover-foreground: 0.15 0.02 264;
+
+    /* Primary blue #2563EB */
+    --primary: 0.505 0.215 264.052;
+    --primary-foreground: 0.99 0 0;
+
+    /* Secondary — light gray */
+    --secondary: 0.963 0.005 247;
+    --secondary-foreground: 0.15 0.02 264;
+
+    /* Muted */
+    --muted: 0.963 0.005 247;
+    --muted-foreground: 0.44 0.015 257;
+
+    /* Accent blue tint #DBEAFE */
+    --accent: 0.922 0.04 248;
+    --accent-foreground: 0.505 0.215 264.052;
+
+    /* Destructive */
+    --destructive: 0.577 0.245 27.325;
+    --destructive-foreground: 0.985 0 0;
+
+    /* Borders */
+    --border: 0.9 0.006 247; /* #E2E8F0 */
+    --input: 0.88 0.008 247; /* #CBD5E1 */
+    --ring: 0.505 0.215 264.052;
+
+    /* Charts */
+    --chart-1: 0.505 0.215 264.052;
+    --chart-2: 0.6 0.118 184.704;
+    --chart-3: 0.646 0.222 41.116;
+    --chart-4: 0.828 0.189 84.429;
+    --chart-5: 0.769 0.188 70.08;
+
+    /* Sidebar */
+    --sidebar: 1 0 0;
+    --sidebar-foreground: 0.15 0.02 264;
+    --sidebar-primary: 0.505 0.215 264.052;
+    --sidebar-primary-foreground: 0.99 0 0;
+    --sidebar-accent: 0.963 0.005 247;
+    --sidebar-accent-foreground: 0.15 0.02 264;
+    --sidebar-border: 0.9 0.006 247;
+    --sidebar-ring: 0.505 0.215 264.052;
+  }
+
+  .dark {
+    --background: 0.15 0.02 264;
+    --foreground: 0.985 0.003 247.858;
+    --card: 0.205 0.015 260;
+    --card-foreground: 0.985 0.003 247.858;
+    --popover: 0.269 0.012 258;
+    --popover-foreground: 0.985 0.003 247.858;
+    --primary: 0.505 0.215 264.052;
+    --primary-foreground: 0.99 0 0;
+    --secondary: 0.269 0.012 258;
+    --secondary-foreground: 0.985 0.003 247.858;
+    --muted: 0.269 0.012 258;
+    --muted-foreground: 0.65 0.012 255;
+    --accent: 0.32 0.05 255;
+    --accent-foreground: 0.985 0.003 247.858;
+    --destructive: 0.704 0.191 22.216;
+    --destructive-foreground: 0.205 0 0;
+    --border: 1 0 0 / 10%;
+    --input: 1 0 0 / 15%;
+    --ring: 0.505 0.215 264.052;
+    --chart-1: 0.488 0.243 264.376;
+    --chart-2: 0.696 0.17 162.48;
+    --chart-3: 0.769 0.188 70.08;
+    --chart-4: 0.627 0.265 303.9;
+    --chart-5: 0.645 0.246 16.439;
+    --sidebar: 0.205 0.015 260;
+    --sidebar-foreground: 0.985 0.003 247.858;
+    --sidebar-primary: 0.505 0.215 264.052;
+    --sidebar-primary-foreground: 0.99 0 0;
+    --sidebar-accent: 0.269 0.012 258;
+    --sidebar-accent-foreground: 0.985 0.003 247.858;
+    --sidebar-border: 1 0 0 / 10%;
+    --sidebar-ring: 0.505 0.215 264.052;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+  }
+}
