@@ -15,7 +15,7 @@ import {
 import { motion } from "motion/react";
 import { useState } from "react";
 import PropertyCard from "../components/PropertyCard";
-import { useInternetIdentity } from "../hooks/useInternetIdentity";
+import { useAuth } from "../hooks/useAuth";
 import { useApprovedProperties } from "../hooks/useQueries";
 
 const STATS = [
@@ -50,7 +50,7 @@ const FEATURES = [
 
 export default function LandingPage() {
   const router = useRouter();
-  const { login, identity } = useInternetIdentity();
+  const { currentRole } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const { data: properties, isLoading } = useApprovedProperties();
 
@@ -63,6 +63,14 @@ export default function LandingPage() {
       search: searchQuery ? { city: searchQuery } : {},
     });
   };
+
+  function handleListProperty() {
+    if (currentRole === "owner") {
+      router.navigate({ to: "/owner/listings/new" });
+    } else {
+      router.navigate({ to: "/auth/role" });
+    }
+  }
 
   return (
     <div className="bg-background">
@@ -124,11 +132,7 @@ export default function LandingPage() {
                 <Button
                   size="lg"
                   variant="outline"
-                  onClick={() =>
-                    identity
-                      ? router.navigate({ to: "/owner/listings/new" })
-                      : login()
-                  }
+                  onClick={handleListProperty}
                   data-ocid="hero.list.button"
                 >
                   List Your Property
@@ -298,11 +302,7 @@ export default function LandingPage() {
             <Button
               size="lg"
               variant="secondary"
-              onClick={() =>
-                identity
-                  ? router.navigate({ to: "/owner/listings/new" })
-                  : login()
-              }
+              onClick={handleListProperty}
               className="text-foreground"
               data-ocid="cta.list_property.button"
             >

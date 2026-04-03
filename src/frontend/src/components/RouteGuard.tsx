@@ -1,8 +1,6 @@
 import { Navigate } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
-import { Variant_admin_owner_student } from "../backend";
-import { useInternetIdentity } from "../hooks/useInternetIdentity";
-import { useCallerProfile, useIsAdmin } from "../hooks/useQueries";
+import { useAuth } from "../hooks/useAuth";
 
 interface RouteGuardProps {
   children: React.ReactNode;
@@ -13,43 +11,38 @@ export default function RouteGuard({
   children,
   requiredRole,
 }: RouteGuardProps) {
-  const { identity, isInitializing } = useInternetIdentity();
-  const { data: profile, isLoading: profileLoading } = useCallerProfile();
-  const { data: isAdmin } = useIsAdmin();
+  const { session, adminSession, currentRole } = useAuth();
 
-  if (isInitializing || profileLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
+  const isAuthenticated = !!session || !!adminSession;
+
+  // Show loading only briefly on first mount (no async here)
+  if (!isAuthenticated) {
+    if (requiredRole) {
+      return <Navigate to="/auth/role" />;
+    }
+    return <>{children}</>;
   }
 
-  if (!identity) {
+  if (requiredRole === "admin" && currentRole !== "admin") {
     return <Navigate to="/" />;
   }
 
-  if (!profile) {
-    return <Navigate to="/auth/setup" />;
-  }
-
-  if (requiredRole === "admin" && !isAdmin) {
+  if (requiredRole === "owner" && currentRole !== "owner") {
     return <Navigate to="/" />;
   }
 
-  if (
-    requiredRole === "owner" &&
-    profile.role !== Variant_admin_owner_student.owner
-  ) {
-    return <Navigate to="/" />;
-  }
-
-  if (
-    requiredRole === "student" &&
-    profile.role !== Variant_admin_owner_student.student
-  ) {
+  if (requiredRole === "student" && currentRole !== "student") {
     return <Navigate to="/" />;
   }
 
   return <>{children}</>;
+}
+
+// Loading spinner helper
+export function LoadingSpinner() {
+  return (
+    <div className="flex items-center justify-center h-64">
+      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+    </div>
+  );
 }

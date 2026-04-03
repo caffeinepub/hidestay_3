@@ -14,11 +14,18 @@ import PaymentSuccessPage from "./pages/PaymentSuccessPage";
 import PropertyDetailPage from "./pages/PropertyDetailPage";
 import SearchPage from "./pages/SearchPage";
 import AdminBookingsPage from "./pages/admin/AdminBookingsPage";
+import AdminCreatePage from "./pages/admin/AdminCreatePage";
 import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
+import AdminForgotPasswordPage from "./pages/admin/AdminForgotPasswordPage";
 import AdminListingsPage from "./pages/admin/AdminListingsPage";
+import AdminLoginPage from "./pages/admin/AdminLoginPage";
+import AdminResetPasswordPage from "./pages/admin/AdminResetPasswordPage";
 import AdminStripePage from "./pages/admin/AdminStripePage";
 import AdminUsersPage from "./pages/admin/AdminUsersPage";
+import OTPVerifyPage from "./pages/auth/OTPVerifyPage";
+import PhoneEntryPage from "./pages/auth/PhoneEntryPage";
 import ProfileSetupPage from "./pages/auth/ProfileSetupPage";
+import RoleSelectionPage from "./pages/auth/RoleSelectionPage";
 import CreateListingPage from "./pages/owner/CreateListingPage";
 import EditListingPage from "./pages/owner/EditListingPage";
 import ListingBookingsPage from "./pages/owner/ListingBookingsPage";
@@ -67,6 +74,32 @@ const myBookingsRoute = createRoute({
   component: MyBookingsPage,
 });
 
+// Auth routes
+const authRoleRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/auth/role",
+  component: RoleSelectionPage,
+});
+
+const authPhoneRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/auth/phone",
+  component: PhoneEntryPage,
+});
+
+const authOtpRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/auth/otp",
+  component: OTPVerifyPage,
+});
+
+const authProfileRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/auth/profile",
+  component: ProfileSetupPage,
+});
+
+// Keep old /auth/setup for backward compat
 const authSetupRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/auth/setup",
@@ -115,6 +148,32 @@ const listingBookingsRoute = createRoute({
   component: ListingBookingsPage,
 });
 
+// Admin auth routes
+const adminLoginRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin/login",
+  component: AdminLoginPage,
+});
+
+const adminForgotPasswordRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin/forgot-password",
+  component: AdminForgotPasswordPage,
+});
+
+const adminResetPasswordRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin/reset-password",
+  component: AdminResetPasswordPage,
+});
+
+const adminCreateRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin/create",
+  component: AdminCreatePage,
+});
+
+// Admin dashboard routes
 const adminDashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/admin/dashboard",
@@ -151,14 +210,26 @@ export const routeTree = rootRoute.addChildren([
   propertyRoute,
   bookingRoute,
   myBookingsRoute,
+  // Auth
+  authRoleRoute,
+  authPhoneRoute,
+  authOtpRoute,
+  authProfileRoute,
   authSetupRoute,
   paymentSuccessRoute,
   paymentCancelRoute,
+  // Owner
   ownerDashboardRoute,
   ownerListingsRoute,
   createListingRoute,
   editListingRoute,
   listingBookingsRoute,
+  // Admin auth
+  adminLoginRoute,
+  adminForgotPasswordRoute,
+  adminResetPasswordRoute,
+  adminCreateRoute,
+  // Admin dashboard
   adminDashboardRoute,
   adminListingsRoute,
   adminUsersRoute,

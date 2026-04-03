@@ -1,4 +1,5 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -8,25 +9,45 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Link, useRouter } from "@tanstack/react-router";
-import { Building2, ChevronDown, Home, LogOut, User } from "lucide-react";
-import { Variant_admin_owner_student } from "../backend";
-import { useInternetIdentity } from "../hooks/useInternetIdentity";
-import { useCallerProfile, useIsAdmin } from "../hooks/useQueries";
+import {
+  Building2,
+  ChevronDown,
+  Home,
+  LogOut,
+  Shield,
+  User,
+} from "lucide-react";
+import { useAuth } from "../hooks/useAuth";
 
 export default function Navbar() {
-  const { login, clear, identity, loginStatus } = useInternetIdentity();
-  const { data: profile } = useCallerProfile();
-  const { data: isAdmin } = useIsAdmin();
+  const { session, adminSession, logout, adminLogout, currentRole } = useAuth();
   const router = useRouter();
 
-  const isLoggedIn = !!identity;
-  const isOwner = profile?.role === Variant_admin_owner_student.owner;
-  const isStudent = profile?.role === Variant_admin_owner_student.student;
-  const isLoggingIn = loginStatus === "logging-in";
+  const isLoggedIn = !!session || !!adminSession;
+  const isStudent = currentRole === "student";
+  const isOwner = currentRole === "owner";
+  const isAdmin = currentRole === "admin";
 
-  const handleLogin = async () => {
-    await login();
-  };
+  const displayName = adminSession
+    ? adminSession.name
+    : session
+      ? `+91 ${session.phone.slice(-5)}`
+      : "";
+
+  const displayInitial = adminSession
+    ? (adminSession.name[0]?.toUpperCase() ?? "A")
+    : session
+      ? session.phone.slice(-2)
+      : "U";
+
+  function handleLogout() {
+    if (adminSession) {
+      adminLogout();
+    } else {
+      logout();
+    }
+    router.navigate({ to: "/" });
+  }
 
   return (
     <header className="sticky top-0 z-50 bg-card border-b border-border shadow-xs">
@@ -36,6 +57,7 @@ export default function Navbar() {
           <Link
             to="/"
             className="flex items-center gap-2 font-display font-bold text-xl text-primary"
+            data-ocid="nav.home.link"
           >
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <Home className="w-4 h-4 text-primary-foreground" />
@@ -97,11 +119,10 @@ export default function Navbar() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleLogin}
-                  disabled={isLoggingIn}
+                  onClick={() => router.navigate({ to: "/auth/role" })}
                   data-ocid="nav.login.button"
                 >
-                  {isLoggingIn ? "Signing in..." : "Sign In"}
+                  Sign In
                 </Button>
                 <Button
                   size="sm"
@@ -121,23 +142,62 @@ export default function Navbar() {
                   >
                     <Avatar className="w-7 h-7">
                       <AvatarFallback className="text-xs bg-primary text-primary-foreground">
-                        {profile?.name?.[0]?.toUpperCase() ?? "U"}
+                        {displayInitial}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="hidden md:block text-sm font-medium">
-                      {profile?.name ?? "User"}
+                    <span className="hidden md:block text-sm font-medium max-w-[120px] truncate">
+                      {displayName}
                     </span>
+                    {isAdmin && (
+                      <Badge
+                        variant="secondary"
+                        className="text-xs hidden md:flex items-center gap-0.5"
+                      >
+                        <Shield className="w-2.5 h-2.5" /> Admin
+                      </Badge>
+                    )}
+                    {isOwner && (
+                      <Badge
+                        variant="secondary"
+                        className="text-xs hidden md:flex"
+                      >
+                        Owner
+                      </Badge>
+                    )}
                     <ChevronDown className="w-3 h-3 text-muted-foreground" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem
-                    onClick={() => router.navigate({ to: "/auth/setup" })}
-                    data-ocid="nav.profile.button"
-                  >
-                    <User className="w-4 h-4 mr-2" />
-                    Profile Settings
-                  </DropdownMenuItem>
+                <DropdownMenuContent align="end" className="w-52">
+                  {/* Role indicator */}
+                  <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border mb-1">
+                    {isAdmin ? (
+                      <span className="flex items-center gap-1">
+                        <Shield className="w-3 h-3" /> Super Admin
+                      </span>
+                    ) : isOwner ? (
+                      <span>Property Owner</span>
+                    ) : (
+                      <span>Student</span>
+                    )}
+                  </div>
+
+                  {!isAdmin && (
+                    <DropdownMenuItem
+                      onClick={() =>
+                        router.navigate({
+                          to: "/auth/profile",
+                          search: {
+                            phone: session?.phone,
+                            role: session?.role,
+                          },
+                        })
+                      }
+                      data-ocid="nav.profile.button"
+                    >
+                      <User className="w-4 h-4 mr-2" />
+                      Profile Settings
+                    </DropdownMenuItem>
+                  )}
                   {isOwner && (
                     <DropdownMenuItem
                       onClick={() =>
@@ -150,19 +210,28 @@ export default function Navbar() {
                     </DropdownMenuItem>
                   )}
                   {isAdmin && (
-                    <DropdownMenuItem
-                      onClick={() =>
-                        router.navigate({ to: "/admin/dashboard" })
-                      }
-                      data-ocid="nav.admin.menu.item"
-                    >
-                      <Building2 className="w-4 h-4 mr-2" />
-                      Admin Panel
-                    </DropdownMenuItem>
+                    <>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          router.navigate({ to: "/admin/dashboard" })
+                        }
+                        data-ocid="nav.admin.menu.item"
+                      >
+                        <Building2 className="w-4 h-4 mr-2" />
+                        Admin Panel
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => router.navigate({ to: "/admin/create" })}
+                        data-ocid="nav.admin.create.item"
+                      >
+                        <User className="w-4 h-4 mr-2" />
+                        Create Admin
+                      </DropdownMenuItem>
+                    </>
                   )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    onClick={() => clear()}
+                    onClick={handleLogout}
                     className="text-destructive"
                     data-ocid="nav.logout.button"
                   >

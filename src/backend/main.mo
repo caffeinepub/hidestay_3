@@ -134,6 +134,9 @@ actor {
   };
 
   public shared ({ caller }) func createCheckoutSession(items : [Stripe.ShoppingItem], successUrl : Text, cancelUrl : Text) : async Text {
+    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only approved users can perform this action");
+    };
     await Stripe.createCheckoutSession(getStripeConfiguration(), caller, items, successUrl, cancelUrl, transform);
   };
 
@@ -160,6 +163,10 @@ actor {
       case (null) { Runtime.trap("Property not found") };
       case (?property) { property };
     };
+    // Verify ownership unless admin
+    if (oldProperty.owner != caller and not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Can only update your own properties");
+    };
     let newProperty : Property = {
       property with
       id = propertyId;
@@ -185,7 +192,13 @@ actor {
   };
 
   public query ({ caller }) func getProperties() : async [Property] {
-    propertyList.values().toArray();
+    // Admins can see all properties, others only see approved
+    if (AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      propertyList.values().toArray();
+    } else {
+      let properties = propertyList.filter(func(_, prop) { prop.approved });
+      properties.values().toArray();
+    };
   };
 
   public query ({ caller }) func getApprovedProperties() : async [Property] {
@@ -194,7 +207,18 @@ actor {
   };
 
   public query ({ caller }) func getProperty(id : Nat) : async ?Property {
-    propertyList.get(id);
+    let property = propertyList.get(id);
+    switch (property) {
+      case (null) { null };
+      case (?prop) {
+        // Admins and owners can see unapproved properties, others only approved
+        if (prop.approved or AccessControl.hasPermission(accessControlState, caller, #admin) or prop.owner == caller) {
+          ?prop;
+        } else {
+          null;
+        };
+      };
+    };
   };
 
   // Bookings
@@ -213,36 +237,56 @@ actor {
       booking with
       id = nextBookingId;
       student = caller;
-      price = property.pricePerMonth;
     };
     bookingList.add(nextBookingId, newBooking);
     nextBookingId += 1;
   };
 
   public query ({ caller }) func getBookings() : async [Booking] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can view all bookings");
+    };
     bookingList.values().toArray();
   };
 
   public query ({ caller }) func getPropertyBookings(propertyId : Nat) : async [Booking] {
+    // Verify caller is property owner or admin
+    let property = switch (propertyList.get(propertyId)) {
+      case (null) { Runtime.trap("Property not found") };
+      case (?property) { property };
+    };
+    if (property.owner != caller and not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Can only view bookings for your own properties");
+    };
     let bookings = bookingList.filter(func(_, b) { b.propertyId == propertyId });
     bookings.values().toArray();
   };
 
-  public query ({ caller }) func getUserBookings(caller : Principal) : async [Booking] {
-    let bookings = bookingList.filter(func(_, b) { b.student == caller });
+  public query ({ caller }) func getUserBookings(user : Principal) : async [Booking] {
+    // Verify caller is querying their own bookings or is admin
+    if (caller != user and not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Can only view your own bookings");
+    };
+    let bookings = bookingList.filter(func(_, b) { b.student == user });
     bookings.values().toArray();
   };
 
-  func getUserBookingsInternal(caller : Principal) : [Booking] {
-    bookingList.filter(func(_, b) { b.student == caller }).values().toArray();
+  func getUserBookingsInternal(user : Principal) : [Booking] {
+    bookingList.filter(func(_, b) { b.student == user }).values().toArray();
   };
 
   // Profiles
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view profiles");
+    };
     profileList.get(caller);
   };
 
   public query ({ caller }) func getUserProfile(user : Principal) : async ?UserProfile {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view profiles");
+    };
     if (caller != user and not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
       Runtime.trap("Unauthorized: Can only view your own profile");
     };
@@ -250,6 +294,9 @@ actor {
   };
 
   public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can save profiles");
+    };
     profileList.add(caller, profile);
   };
 

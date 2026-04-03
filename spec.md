@@ -1,52 +1,62 @@
 # Hidestay
 
 ## Current State
-New project. No existing application files.
+
+Hidestay is a student rental marketplace with:
+- Internet Identity (ICP) as the primary login mechanism
+- Single profile setup page at `/auth/setup` that collects: Name, Email, Phone, Role (Student/Owner)
+- Role-based access: Student, Owner, Admin
+- Booking, listing, admin pages all functional
+- Backend stores `UserProfile` with: name, phone, email, role
+- No role-specific extended profile fields
+- Admin access controlled via Internet Identity + role assignment
 
 ## Requested Changes (Diff)
 
 ### Add
-- Full student rental marketplace with 3 role-based flows
-- Role-based access control: Student, Owner, Super Admin
-- Property listing system with full details (photos, price, room type, amenities, rules, distance from college)
-- Student search & filter (location, price, room type, amenities)
-- Student direct booking flow with Stripe payment integration
-- Owner dashboard: create/edit/delete listings, view bookings
-- Super Admin dashboard: approve/reject listings, manage users (ban/approve), handle disputes, feature listings, platform monitoring
-- Image uploads for property photos (blob storage)
-- Booking management: status tracking (pending, confirmed, cancelled)
-- User profiles for students and owners
+- **Mobile OTP Login Flow** (simulated): Replace Internet Identity with mobile number + OTP based authentication
+  - Step 1: Role selection page — "I am a Student" / "I am a Property Owner"
+  - Step 2: Enter mobile number
+  - Step 3: OTP verification screen (simulated — backend generates/validates OTP)
+  - Step 4: Profile setup (role-specific fields)
+- **Role-Specific Profile Fields**:
+  - Student: College Name, Preferred Location, Budget Range, Gender
+  - Owner: Business Name, Property Location, ID Proof upload (Aadhaar/PAN — file upload)
+- **Separate Admin Login Page** at `/admin/login`:
+  - Email + Password login form
+  - "Forgot Password" flow (generate reset token, email-free — show reset code in UI since email is disabled)
+  - "Create New Admin" form (protected — only existing admin can create)
+- **Backend OTP functions**: generateOTP(phone), verifyOTP(phone, otp), getSession
+- **Backend Admin Auth**: adminLogin(email, password), adminForgotPassword(email), adminResetPassword(token, newPassword), createAdmin(email, password)
+- **Extended UserProfile**: Add college, preferredLocation, budgetMin, budgetMax, gender (for students), businessName, propertyLocation, idProofUrl (for owners)
+- **OTP session management**: Store phone-based sessions in backend, map phone to Principal
 
 ### Modify
-- N/A (new project)
+- `UserProfile` type in backend: extend with optional role-specific fields
+- `ProfileSetupPage`: Replace with new multi-step registration flow
+- `useInternetIdentity` hook: Keep for backend actor calls but auth gating replaced with OTP session
+- `Navbar`: Update login/logout to use new mobile auth system
+- `RouteGuard`: Update to check OTP session instead of Internet Identity
+- Admin pages: Update to check admin email session instead of Internet Identity admin role
 
 ### Remove
-- N/A (new project)
+- Internet Identity as the user-facing login method (kept internally for actor calls, but UI login via mobile OTP)
+- "Sign In with Internet Identity" button from all pages
 
 ## Implementation Plan
 
-### Backend (Motoko)
-- Authorization with roles: student, owner, admin
-- Property data model: id, ownerId, title, description, address, city, college, distanceFromCollege, price, roomType (single/double/triple/shared), amenities, rules, photos (blob IDs), status (pending/approved/rejected/featured), createdAt
-- Booking data model: id, propertyId, studentId, checkIn, checkOut, totalAmount, status (pending/confirmed/cancelled), stripePaymentId, createdAt
-- User profile model: id, role, name, phone, college (for students), isApproved, isBanned
-- CRUD APIs for properties (owner-scoped)
-- Search/filter API for properties (students)
-- Booking APIs: create, confirm, cancel
-- Stripe payment initiation and webhook handling
-- Admin APIs: approve/reject listings, feature listings, ban/unban users, view disputes
-- Dispute model and APIs
-
-### Frontend (React + TypeScript)
-- Landing page with search bar and featured properties
-- Auth flow with role selection on signup (student/owner)
-- Student: property search/filter page, property detail page, booking flow, payment page, my bookings page
-- Owner: dashboard, create/edit listing form (with photo upload), manage listings, view bookings
-- Super Admin: listings management, user management, disputes panel, platform stats
-- Shared: navbar with role-aware navigation, property cards, loading states
-
-### Components
-- authorization (role-based access)
-- blob-storage (property photos)
-- stripe (payment integration)
-- user-approval (owner/listing approval)
+1. **Backend**: Add OTP auth functions, admin email/password auth, extended UserProfile fields, phone-to-principal mapping
+2. **Frontend Auth Context**: Create a new `useAuth` hook that manages:
+   - OTP-based student/owner sessions stored in localStorage
+   - Admin email/password sessions stored in localStorage
+3. **New Pages**:
+   - `/auth/role` — Role selection
+   - `/auth/phone` — Mobile number entry
+   - `/auth/otp` — OTP verification
+   - `/auth/profile` — Role-specific profile setup (replaces current `/auth/setup`)
+   - `/admin/login` — Admin email+password login
+   - `/admin/forgot-password` — Forgot password
+   - `/admin/reset-password` — Reset password
+   - `/admin/create` — Create new admin (admin only)
+4. **Update routing**: Add new auth routes, protect admin routes with admin session
+5. **Update Navbar**: Show mobile number + logout instead of II identity

@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,7 @@ import { toast } from "sonner";
 import { Variant_cancelled_pending_paid_rejected } from "../backend";
 import type { Booking } from "../backend";
 import RouteGuard from "../components/RouteGuard";
+import { useAuth } from "../hooks/useAuth";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useBookProperty,
@@ -35,6 +37,7 @@ function BookingPageInner() {
   const { propertyId } = useParams({ strict: false }) as { propertyId: string };
   const router = useRouter();
   const { identity } = useInternetIdentity();
+  const { session } = useAuth();
   const { data: property, isLoading: propLoading } = useProperty(
     BigInt(propertyId ?? "0"),
   );
@@ -46,7 +49,7 @@ function BookingPageInner() {
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [name, setName] = useState(profile?.name ?? "");
   const [email, setEmail] = useState(profile?.email ?? "");
-  const [phone, setPhone] = useState(profile?.phone ?? "");
+  const [phone, setPhone] = useState(session?.phone ?? profile?.phone ?? "");
 
   const months =
     startDate && endDate

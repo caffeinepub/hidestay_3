@@ -16,7 +16,7 @@ import {
   Variant_admin_owner_student,
   Variant_apartment_sharedRoom_single,
 } from "../backend";
-import { useInternetIdentity } from "../hooks/useInternetIdentity";
+import { useAuth } from "../hooks/useAuth";
 import { useCallerProfile, useProperty } from "../hooks/useQueries";
 
 const roomTypeLabels: Record<Variant_apartment_sharedRoom_single, string> = {
@@ -28,7 +28,7 @@ const roomTypeLabels: Record<Variant_apartment_sharedRoom_single, string> = {
 export default function PropertyDetailPage() {
   const { id } = useParams({ strict: false }) as { id: string };
   const router = useRouter();
-  const { identity, login } = useInternetIdentity();
+  const { isAuthenticated, currentRole } = useAuth();
   const { data: profile } = useCallerProfile();
   const { data: property, isLoading } = useProperty(BigInt(id ?? "0"));
   const [photoIndex, setPhotoIndex] = useState(0);
@@ -73,11 +73,13 @@ export default function PropertyDetailPage() {
 
   const currentPhoto = photos[photoIndex] || fallbackImages[0];
 
-  const isStudent = profile?.role === Variant_admin_owner_student.student;
+  const isStudent =
+    currentRole === "student" ||
+    profile?.role === Variant_admin_owner_student.student;
 
   const handleBook = () => {
-    if (!identity) {
-      login();
+    if (!isAuthenticated) {
+      router.navigate({ to: "/auth/role" });
       return;
     }
     router.navigate({ to: "/booking/$propertyId", params: { propertyId: id } });
@@ -236,17 +238,17 @@ export default function PropertyDetailPage() {
               </div>
             </div>
 
-            {(!identity || isStudent) && (
+            {(!isAuthenticated || isStudent) && (
               <Button
                 className="w-full"
                 size="lg"
                 onClick={handleBook}
                 data-ocid="property.book.button"
               >
-                {!identity ? "Sign In to Book" : "Book Now"}
+                {!isAuthenticated ? "Sign In to Book" : "Book Now"}
               </Button>
             )}
-            {identity && !isStudent && (
+            {isAuthenticated && !isStudent && (
               <p className="text-sm text-muted-foreground text-center">
                 Only students can book properties.
               </p>

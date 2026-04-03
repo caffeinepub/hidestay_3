@@ -147,7 +147,7 @@ export interface backendInterface {
     getProperty(id: bigint): Promise<Property | null>;
     getPropertyBookings(propertyId: bigint): Promise<Array<Booking>>;
     getStripeSessionStatus(sessionId: string): Promise<StripeSessionStatus>;
-    getUserBookings(caller: Principal): Promise<Array<Booking>>;
+    getUserBookings(user: Principal): Promise<Array<Booking>>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
     isCallerApproved(): Promise<boolean>;

@@ -3,7 +3,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "@tanstack/react-router";
 import { format } from "date-fns";
 import { Building2, Calendar } from "lucide-react";
-import { Variant_cancelled_pending_paid_rejected } from "../backend";
 import RouteGuard from "../components/RouteGuard";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { useMyBookings } from "../hooks/useQueries";
