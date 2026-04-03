@@ -108,6 +108,8 @@ function CreateListingInner() {
           ? BigInt(new Date(availableFrom).getTime()) * 1_000_000n
           : BigInt(Date.now()) * 1_000_000n,
         approved: false,
+        verified: false,
+        viewCount: BigInt(0),
         genderPreference: genderPreference as Variant_boys_unisex_girls,
         contactPhone,
         address: {

@@ -6,7 +6,8 @@ import Map "mo:core/Map";
 import Runtime "mo:core/Runtime";
 import Principal "mo:core/Principal";
 import Iter "mo:core/Iter";
-
+import Set "mo:core/Set";
+import Migration "migration";
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
 import Stripe "stripe/stripe";
@@ -15,8 +16,7 @@ import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
 import UserApproval "user-approval/approval";
 
-// migration with-clause
-
+(with migration = Migration.run)
 actor {
   // Mixin with role-based access control
   let accessControlState = AccessControl.initState();
@@ -68,6 +68,8 @@ actor {
     availableFrom : Time.Time;
     contactPhone : Text;
     genderPreference : { #boys; #girls; #unisex };
+    verified : Bool;
+    viewCount : Nat;
   };
 
   // Should contain property listing
@@ -104,15 +106,51 @@ actor {
     role : { #student; #owner; #admin };
   };
 
+  // Report/Complaint type
+  public type Report = {
+    id : Nat;
+    reporterId : Principal;
+    targetPropertyId : Nat;
+    reason : Text;
+    description : Text;
+    status : { #pending; #resolved; #dismissed };
+    timestamp : Time.Time;
+    actionTaken : ?Text;
+  };
+
+  // Announcement type
+  public type Announcement = {
+    id : Nat;
+    title : Text;
+    message : Text;
+    createdAt : Time.Time;
+    expiresAt : ?Time.Time;
+    isActive : Bool;
+  };
+
+  // Property view event
+  public type PropertyViewEvent = {
+    propertyId : Nat;
+    viewer : Principal;
+    timestamp : Time.Time;
+  };
+
   // Store user profiles, properties, bookings, wishlists, and reviews
   let propertyList = Map.empty<Nat, Property>();
   let bookingList = Map.empty<Nat, Booking>();
   let profileList = Map.empty<Principal, UserProfile>();
   let wishlistMap = Map.empty<Principal, [Nat]>();
   let reviewMap = Map.empty<Nat, [Review]>();
+  let blockedUsers = Set.empty<Principal>();
+  let reportList = Map.empty<Nat, Report>();
+  let announcementList = Map.empty<Nat, Announcement>();
+  let propertyViewEvents = Map.empty<Nat, [PropertyViewEvent]>();
+  let dailyActiveUsers = Map.empty<Text, Set.Set<Principal>>();
 
   var nextPropertyId = 0;
   var nextBookingId = 0;
+  var nextReportId = 0;
+  var nextAnnouncementId = 0;
 
   // Inquiry type
   public type Inquiry = {
@@ -146,6 +184,19 @@ actor {
   // Stripe integration
   var configuration : ?Stripe.StripeConfiguration = null;
 
+  func checkBlocked(caller : Principal) {
+    if (blockedUsers.contains(caller)) {
+      Runtime.trap("User is blocked from performing this action");
+    };
+  };
+
+  // Helper function to get date string from timestamp
+  func getDateString(timestamp : Time.Time) : Text {
+    let seconds = timestamp / 1_000_000_000;
+    let days = seconds / 86400;
+    days.toText();
+  };
+
   public query func isStripeConfigured() : async Bool {
     configuration != null;
   };
@@ -170,12 +221,14 @@ actor {
     };
     // Additional check: verify the session belongs to a booking by this user or they are admin
     let userBookings = getUserBookingsInternal(caller);
-    let hasAccess = userBookings.any<Booking>(func(b) {
-      switch (b.stripeSessionId) {
-        case (?sid) { sid == sessionId };
-        case (null) { false };
-      };
-    }) or AccessControl.hasPermission(accessControlState, caller, #admin);
+    let hasAccess = userBookings.any<Booking>(
+      func(b) {
+        switch (b.stripeSessionId) {
+          case (?sid) { sid == sessionId };
+          case (null) { false };
+        };
+      }
+    ) or AccessControl.hasPermission(accessControlState, caller, #admin);
 
     if (not hasAccess) {
       Runtime.trap("Unauthorized: Can only check status of your own sessions");
@@ -193,6 +246,7 @@ actor {
 
   // Property management
   public shared ({ caller }) func listProperty(property : Property) : async () {
+    checkBlocked(caller);
     if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
       Runtime.trap("Unauthorized: Only approved users can perform this action");
     };
@@ -201,12 +255,15 @@ actor {
       id = nextPropertyId;
       owner = caller;
       approved = false;
+      verified = false;
+      viewCount = 0;
     };
     propertyList.add(nextPropertyId, newProperty);
     nextPropertyId += 1;
   };
 
   public shared ({ caller }) func updateProperty(propertyId : Nat, property : Property) : async () {
+    checkBlocked(caller);
     if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
       Runtime.trap("Unauthorized: Only approved users can perform this action");
     };
@@ -223,6 +280,8 @@ actor {
       id = propertyId;
       approved = false;
       owner = oldProperty.owner;
+      verified = oldProperty.verified;
+      viewCount = oldProperty.viewCount;
     };
     propertyList.add(propertyId, newProperty);
   };
@@ -238,6 +297,21 @@ actor {
     let newProperty : Property = {
       property with
       approved = true;
+    };
+    propertyList.add(propertyId, newProperty);
+  };
+
+  public shared ({ caller }) func verifyProperty(propertyId : Nat) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can perform this action");
+    };
+    let property = switch (propertyList.get(propertyId)) {
+      case (null) { Runtime.trap("Property not found") };
+      case (?property) { property };
+    };
+    let newProperty : Property = {
+      property with
+      verified = true;
     };
     propertyList.add(propertyId, newProperty);
   };
@@ -272,8 +346,37 @@ actor {
     };
   };
 
+  public shared ({ caller }) func trackPropertyView(propertyId : Nat) : async () {
+    // Any user (including guests) can track views
+    let property = switch (propertyList.get(propertyId)) {
+      case (null) { Runtime.trap("Property not found") };
+      case (?property) { property };
+    };
+
+    // Increment view count
+    let updatedProperty : Property = {
+      property with
+      viewCount = property.viewCount + 1;
+    };
+    propertyList.add(propertyId, updatedProperty);
+
+    // Store view event
+    let viewEvent : PropertyViewEvent = {
+      propertyId = propertyId;
+      viewer = caller;
+      timestamp = Time.now();
+    };
+
+    let existingEvents = switch (propertyViewEvents.get(propertyId)) {
+      case (null) { [] };
+      case (?events) { events };
+    };
+    propertyViewEvents.add(propertyId, existingEvents.concat([viewEvent]));
+  };
+
   // Bookings
   public shared ({ caller }) func bookProperty(booking : Booking) : async () {
+    checkBlocked(caller);
     if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
       Runtime.trap("Unauthorized: Only approved users can perform this action");
     };
@@ -301,7 +404,6 @@ actor {
   };
 
   public query ({ caller }) func getPropertyBookings(propertyId : Nat) : async [Booking] {
-    // Verify caller is property owner or admin
     let property = switch (propertyList.get(propertyId)) {
       case (null) { Runtime.trap("Property not found") };
       case (?property) { property };
@@ -384,6 +486,7 @@ actor {
 
   // Wishlist functions
   public shared ({ caller }) func addToWishlist(propertyId : Nat) : async () {
+    checkBlocked(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can manage wishlist");
     };
@@ -408,6 +511,7 @@ actor {
   };
 
   public shared ({ caller }) func removeFromWishlist(propertyId : Nat) : async () {
+    checkBlocked(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can manage wishlist");
     };
@@ -434,6 +538,7 @@ actor {
 
   // Review functions
   public shared ({ caller }) func addReview(propertyId : Nat, rating : Nat, comment : Text) : async () {
+    checkBlocked(caller);
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can submit reviews");
     };
@@ -488,6 +593,7 @@ actor {
 
   // Inquiry functions
   public shared ({ caller }) func createInquiry(propertyId : Nat, studentName : Text, studentPhone : Text, inquiryType : { #bookVisit; #contactOwner }, message : Text) : async () {
+    checkBlocked(caller);
     // Only approved users can create inquiry
     if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
       Runtime.trap("Unauthorized: Only approved users can create inquiries");
@@ -653,5 +759,247 @@ actor {
     };
     // Remove it from persistent storage
     propertyList.remove(propertyId);
+  };
+
+  // Block a user (admin only)
+  public shared ({ caller }) func blockUser(user : Principal) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can perform this action");
+    };
+    blockedUsers.add(user);
+  };
+
+  // Unblock a user (admin only)
+  public shared ({ caller }) func unblockUser(user : Principal) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can perform this action");
+    };
+    blockedUsers.remove(user);
+  };
+
+  // Check if a user is blocked
+  public query func isUserBlocked(user : Principal) : async Bool {
+    blockedUsers.contains(user);
+  };
+
+  // Report/Complaint system
+  public shared ({ caller }) func submitReport(targetPropertyId : Nat, reason : Text, description : Text) : async () {
+    checkBlocked(caller);
+    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only approved users can submit reports");
+    };
+
+    // Verify property exists
+    switch (propertyList.get(targetPropertyId)) {
+      case (null) { Runtime.trap("Property not found") };
+      case (?_) {};
+    };
+
+    let report : Report = {
+      id = nextReportId;
+      reporterId = caller;
+      targetPropertyId = targetPropertyId;
+      reason = reason;
+      description = description;
+      status = #pending;
+      timestamp = Time.now();
+      actionTaken = null;
+    };
+
+    reportList.add(nextReportId, report);
+    nextReportId += 1;
+  };
+
+  public query ({ caller }) func getReports() : async [Report] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can view reports");
+    };
+    reportList.values().toArray();
+  };
+
+  public shared ({ caller }) func resolveReport(reportId : Nat, actionTaken : Text) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can resolve reports");
+    };
+
+    let report = switch (reportList.get(reportId)) {
+      case (null) { Runtime.trap("Report not found") };
+      case (?report) { report };
+    };
+
+    let updatedReport : Report = {
+      report with
+      status = #resolved;
+      actionTaken = ?actionTaken;
+    };
+
+    reportList.add(reportId, updatedReport);
+  };
+
+  public shared ({ caller }) func dismissReport(reportId : Nat) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can dismiss reports");
+    };
+
+    let report = switch (reportList.get(reportId)) {
+      case (null) { Runtime.trap("Report not found") };
+      case (?report) { report };
+    };
+
+    let updatedReport : Report = {
+      report with
+      status = #dismissed;
+    };
+
+    reportList.add(reportId, updatedReport);
+  };
+
+  // Announcements system
+  public shared ({ caller }) func createAnnouncement(title : Text, message : Text, expiresAt : ?Time.Time) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can create announcements");
+    };
+
+    let announcement : Announcement = {
+      id = nextAnnouncementId;
+      title = title;
+      message = message;
+      createdAt = Time.now();
+      expiresAt = expiresAt;
+      isActive = true;
+    };
+
+    announcementList.add(nextAnnouncementId, announcement);
+    nextAnnouncementId += 1;
+  };
+
+  public query func getActiveAnnouncements() : async [Announcement] {
+    let now = Time.now();
+    let announcements = announcementList.filter(
+      func(_, announcement) {
+        announcement.isActive and (
+          switch (announcement.expiresAt) {
+            case (null) { true };
+            case (?expiry) { expiry > now };
+          }
+        )
+      }
+    );
+    announcements.values().toArray();
+  };
+
+  public shared ({ caller }) func deactivateAnnouncement(announcementId : Nat) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can deactivate announcements");
+    };
+
+    let announcement = switch (announcementList.get(announcementId)) {
+      case (null) { Runtime.trap("Announcement not found") };
+      case (?announcement) { announcement };
+    };
+
+    let updatedAnnouncement : Announcement = {
+      announcement with
+      isActive = false;
+    };
+
+    announcementList.add(announcementId, updatedAnnouncement);
+  };
+
+  // Analytics
+  public query ({ caller }) func getAnalyticsSummary() : async {
+    totalUsers : Nat;
+    totalProperties : Nat;
+    activeListings : Nat;
+    pendingListings : Nat;
+    totalBookings : Nat;
+    totalInquiries : Nat;
+    totalReports : Nat;
+  } {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can view analytics");
+    };
+
+    let totalUsers = profileList.size();
+    let totalProperties = propertyList.size();
+    let activeListings = propertyList.filter(func(_, prop) { prop.approved }).size();
+    let pendingListings = propertyList.filter(func(_, prop) { not prop.approved }).size();
+    let totalBookings = bookingList.size();
+    let totalInquiries = inquiriesList.size();
+    let totalReports = reportList.size();
+
+    {
+      totalUsers = totalUsers;
+      totalProperties = totalProperties;
+      activeListings = activeListings;
+      pendingListings = pendingListings;
+      totalBookings = totalBookings;
+      totalInquiries = totalInquiries;
+      totalReports = totalReports;
+    };
+  };
+
+  // Daily active users tracking
+  public shared ({ caller }) func trackActivity() : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only authenticated users can track activity");
+    };
+
+    let today = getDateString(Time.now());
+    let todayUsers = switch (dailyActiveUsers.get(today)) {
+      case (null) { Set.empty<Principal>() };
+      case (?users) { users };
+    };
+
+    todayUsers.add(caller);
+    dailyActiveUsers.add(today, todayUsers);
+  };
+
+  public query ({ caller }) func getDailyActiveUserCounts() : async [{ date : Text; count : Nat }] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can view daily active user counts");
+    };
+
+    let now = Time.now();
+    let currentDay = getDateString(now);
+    let currentDayNum = switch (Nat.fromText(currentDay)) {
+      case (null) { 0 };
+      case (?n) { n };
+    };
+
+    let result = Array.tabulate(
+      30,
+      func(i : Nat) : { date : Text; count : Nat } {
+        let dayNum = switch (currentDayNum >= i) {
+          case (true) { currentDayNum - i };
+          case (false) { 0 };
+        };
+        let dateStr = dayNum.toText();
+        let count = switch (dailyActiveUsers.get(dateStr)) {
+          case (null) { 0 };
+          case (?users) { users.size() };
+        };
+        { date = dateStr; count = count };
+      }
+    );
+
+    result;
+  };
+
+  // Stripe payments via HTTP outcall
+  public shared ({ caller }) func getStripePayments() : async Text {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can view Stripe payments");
+    };
+
+    let config = getStripeConfiguration();
+
+    await OutCall.httpGetRequest(
+      "https://api.stripe.com/v1/payment_intents?limit=20",
+      [
+        { name = "Authorization"; value = "Bearer " # config.secretKey },
+      ],
+      transform,
+    );
   };
 };

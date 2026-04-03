@@ -1,5 +1,20 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useParams, useRouter } from "@tanstack/react-router";
@@ -11,15 +26,17 @@ import {
   CheckCircle,
   ChevronLeft,
   ChevronRight,
+  Flag,
   Heart,
   Loader2,
   MapPin,
   MessageSquare,
   Phone,
+  ShieldCheck,
   Star,
   Users,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   Variant_admin_owner_student,
@@ -34,6 +51,8 @@ import {
   useCreateInquiry,
   useProperty,
   usePropertyReviews,
+  useSubmitReport,
+  useTrackPropertyView,
 } from "../hooks/useQueries";
 import { useWishlist } from "../hooks/useWishlist";
 
@@ -48,6 +67,13 @@ const genderLabels: Record<Variant_boys_unisex_girls, string> = {
   [Variant_boys_unisex_girls.girls]: "Girls Only",
   [Variant_boys_unisex_girls.unisex]: "Unisex",
 };
+
+const reportReasons = [
+  "Fake Listing",
+  "Fraud Owner",
+  "Wrong Information",
+  "Other",
+];
 
 function WhatsAppIcon({ className }: { className?: string }) {
   return (
@@ -289,6 +315,8 @@ export default function PropertyDetailPage() {
   const { data: property, isLoading } = useProperty(BigInt(id ?? "0"));
   const [photoIndex, setPhotoIndex] = useState(0);
   const createInquiry = useCreateInquiry();
+  const trackView = useTrackPropertyView();
+  const submitReport = useSubmitReport();
 
   const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist(
     session?.phone,
@@ -297,6 +325,20 @@ export default function PropertyDetailPage() {
   const { data: reviews } = usePropertyReviews(
     property ? property.id : undefined,
   );
+
+  // Track property view on mount - using property id as stable dep
+  const propertyId = property?.id;
+  const trackViewMutate = trackView.mutate;
+  useEffect(() => {
+    if (propertyId !== undefined) {
+      trackViewMutate(propertyId);
+    }
+  }, [propertyId, trackViewMutate]);
+
+  // Report dialog state
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reportDescription, setReportDescription] = useState("");
 
   const fallbackImages = [
     "/assets/generated/property-studio.dim_800x500.jpg",
@@ -370,6 +412,32 @@ export default function PropertyDetailPage() {
     });
   }
 
+  async function handleSubmitReport(e: React.FormEvent) {
+    e.preventDefault();
+    if (!property) return;
+    if (!reportReason) {
+      toast.error("Please select a reason");
+      return;
+    }
+    if (!reportDescription.trim()) {
+      toast.error("Please add a description");
+      return;
+    }
+    try {
+      await submitReport.mutateAsync({
+        targetPropertyId: property.id,
+        reason: reportReason,
+        description: reportDescription.trim(),
+      });
+      toast.success("Report submitted. Our team will review it.");
+      setReportDialogOpen(false);
+      setReportReason("");
+      setReportDescription("");
+    } catch {
+      toast.error("Failed to submit report. Please try again.");
+    }
+  }
+
   const availableDate = new Date(
     Number(property.availableFrom / 1_000_000n),
   ).toLocaleDateString("en-IN", {
@@ -403,15 +471,31 @@ export default function PropertyDetailPage() {
 
   return (
     <div className="container max-w-5xl mx-auto px-4 sm:px-6 py-10">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => router.history.back()}
-        className="mb-6 -ml-2"
-        data-ocid="property.back.button"
-      >
-        <ChevronLeft className="w-4 h-4 mr-1" /> Back
-      </Button>
+      <div className="flex items-center justify-between mb-6">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => router.history.back()}
+          className="-ml-2"
+          data-ocid="property.back.button"
+        >
+          <ChevronLeft className="w-4 h-4 mr-1" /> Back
+        </Button>
+
+        {/* Report button - only for logged-in students */}
+        {isAuthenticated && isStudent && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-destructive gap-1.5"
+            onClick={() => setReportDialogOpen(true)}
+            data-ocid="property.report.button"
+          >
+            <Flag className="w-4 h-4" />
+            Report Listing
+          </Button>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main content */}
@@ -468,13 +552,18 @@ export default function PropertyDetailPage() {
               <h1 className="font-display font-bold text-2xl sm:text-3xl">
                 {property.title}
               </h1>
-              <div className="flex items-center gap-2 shrink-0 mt-1">
+              <div className="flex items-center gap-2 shrink-0 mt-1 flex-wrap">
                 <Badge variant="secondary">
                   {roomTypeLabels[property.roomType]}
                 </Badge>
                 {property.approved && (
                   <Badge className="bg-green-600 text-white hover:bg-green-700">
                     <CheckCircle className="w-3 h-3 mr-1" /> Verified
+                  </Badge>
+                )}
+                {property.verified && (
+                  <Badge className="bg-blue-600 text-white hover:bg-blue-700">
+                    <ShieldCheck className="w-3 h-3 mr-1" /> Verified Listing
                   </Badge>
                 )}
               </div>
@@ -704,6 +793,78 @@ export default function PropertyDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Report Dialog */}
+      <Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
+        <DialogContent
+          className="sm:max-w-md"
+          data-ocid="property.report.dialog"
+        >
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Flag className="w-4 h-4 text-destructive" />
+              Report this Listing
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmitReport} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="report-reason">Reason</Label>
+              <Select value={reportReason} onValueChange={setReportReason}>
+                <SelectTrigger
+                  id="report-reason"
+                  data-ocid="property.report.select"
+                >
+                  <SelectValue placeholder="Select a reason..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {reportReasons.map((r) => (
+                    <SelectItem key={r} value={r}>
+                      {r}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="report-desc">Description</Label>
+              <Textarea
+                id="report-desc"
+                placeholder="Please describe the issue in detail..."
+                value={reportDescription}
+                onChange={(e) => setReportDescription(e.target.value)}
+                rows={4}
+                required
+                data-ocid="property.report.textarea"
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setReportDialogOpen(false)}
+                data-ocid="property.report.cancel.button"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="destructive"
+                disabled={submitReport.isPending}
+                data-ocid="property.report.submit.button"
+              >
+                {submitReport.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  "Submit Report"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

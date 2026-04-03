@@ -14,12 +14,16 @@ import PaymentSuccessPage from "./pages/PaymentSuccessPage";
 import PropertyDetailPage from "./pages/PropertyDetailPage";
 import SearchPage from "./pages/SearchPage";
 import WishlistPage from "./pages/WishlistPage";
+import AdminAnalyticsPage from "./pages/admin/AdminAnalyticsPage";
+import AdminAnnouncementsPage from "./pages/admin/AdminAnnouncementsPage";
 import AdminBookingsPage from "./pages/admin/AdminBookingsPage";
 import AdminCreatePage from "./pages/admin/AdminCreatePage";
 import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
 import AdminForgotPasswordPage from "./pages/admin/AdminForgotPasswordPage";
 import AdminListingsPage from "./pages/admin/AdminListingsPage";
 import AdminLoginPage from "./pages/admin/AdminLoginPage";
+import AdminPaymentsPage from "./pages/admin/AdminPaymentsPage";
+import AdminReportsPage from "./pages/admin/AdminReportsPage";
 import AdminResetPasswordPage from "./pages/admin/AdminResetPasswordPage";
 import AdminReviewsPage from "./pages/admin/AdminReviewsPage";
 import AdminStripePage from "./pages/admin/AdminStripePage";
@@ -232,6 +236,30 @@ const adminReviewsRoute = createRoute({
   component: AdminReviewsPage,
 });
 
+const adminReportsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin/reports",
+  component: AdminReportsPage,
+});
+
+const adminPaymentsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin/payments",
+  component: AdminPaymentsPage,
+});
+
+const adminAnalyticsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin/analytics",
+  component: AdminAnalyticsPage,
+});
+
+const adminAnnouncementsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin/announcements",
+  component: AdminAnnouncementsPage,
+});
+
 export const routeTree = rootRoute.addChildren([
   indexRoute,
   searchRoute,
@@ -267,6 +295,10 @@ export const routeTree = rootRoute.addChildren([
   adminBookingsRoute,
   adminStripeRoute,
   adminReviewsRoute,
+  adminReportsRoute,
+  adminPaymentsRoute,
+  adminAnalyticsRoute,
+  adminAnnouncementsRoute,
 ]);
 
 declare module "@tanstack/react-router" {

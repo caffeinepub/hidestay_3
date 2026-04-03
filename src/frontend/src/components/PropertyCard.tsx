@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Link } from "@tanstack/react-router";
-import { CheckCircle, MapPin, Star } from "lucide-react";
+import { CheckCircle, MapPin, ShieldCheck, Star } from "lucide-react";
 import type { Property } from "../backend";
 import { Variant_apartment_sharedRoom_single } from "../backend";
 import { usePropertyReviews } from "../hooks/useQueries";
@@ -65,6 +65,12 @@ export default function PropertyCard({
           {property.approved && (
             <div className="absolute bottom-3 left-3 flex items-center gap-1 bg-green-600 text-white text-xs font-semibold px-2 py-0.5 rounded-full">
               <CheckCircle className="w-3 h-3" /> Verified
+            </div>
+          )}
+          {/* Verified badge (admin-verified) */}
+          {property.verified && (
+            <div className="absolute bottom-3 right-3 flex items-center gap-1 bg-blue-600 text-white text-xs font-semibold px-2 py-0.5 rounded-full">
+              <ShieldCheck className="w-3 h-3" /> Verified
             </div>
           )}
         </div>

@@ -9,11 +9,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CheckCircle2, Users, XCircle } from "lucide-react";
+import { CheckCircle2, Lock, Unlock, Users, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { ApprovalStatus } from "../../backend";
 import RouteGuard from "../../components/RouteGuard";
-import { useListApprovals, useSetApproval } from "../../hooks/useQueries";
+import {
+  useBlockUser,
+  useListApprovals,
+  useSetApproval,
+  useUnblockUser,
+} from "../../hooks/useQueries";
 
 const statusColors: Record<ApprovalStatus, string> = {
   [ApprovalStatus.approved]: "bg-green-100 text-green-700 border-green-200",
@@ -32,15 +37,37 @@ export default function AdminUsersPage() {
 function AdminUsersInner() {
   const { data: approvals, isLoading } = useListApprovals();
   const setApproval = useSetApproval();
+  const blockUser = useBlockUser();
+  const unblockUser = useUnblockUser();
 
   const handleSetApproval = async (principal: any, status: ApprovalStatus) => {
     try {
       await setApproval.mutateAsync({ principal, status });
       toast.success(
-        `User ${status === ApprovalStatus.approved ? "approved" : "rejected"} successfully!`,
+        `User ${
+          status === ApprovalStatus.approved ? "approved" : "rejected"
+        } successfully!`,
       );
     } catch {
       toast.error("Failed to update user status.");
+    }
+  };
+
+  const handleBlock = async (principal: any) => {
+    try {
+      await blockUser.mutateAsync(principal);
+      toast.success("User blocked");
+    } catch {
+      toast.error("Failed to block user");
+    }
+  };
+
+  const handleUnblock = async (principal: any) => {
+    try {
+      await unblockUser.mutateAsync(principal);
+      toast.success("User unblocked");
+    } catch {
+      toast.error("Failed to unblock user");
     }
   };
 
@@ -51,7 +78,7 @@ function AdminUsersInner() {
           User Management
         </h1>
         <p className="text-muted-foreground">
-          Approve or reject property owners requesting access
+          Approve, reject, or block property owners requesting access
         </p>
       </div>
 
@@ -104,7 +131,7 @@ function AdminUsersInner() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex items-center justify-end gap-2 flex-wrap">
                       {a.status !== ApprovalStatus.approved && (
                         <Button
                           size="sm"
@@ -136,6 +163,24 @@ function AdminUsersInner() {
                           <XCircle className="w-4 h-4 mr-1" /> Reject
                         </Button>
                       )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleBlock(a.principal)}
+                        disabled={blockUser.isPending}
+                        data-ocid={`admin_users.block.button.${i + 1}`}
+                      >
+                        <Lock className="w-4 h-4 mr-1" /> Block
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleUnblock(a.principal)}
+                        disabled={unblockUser.isPending}
+                        data-ocid={`admin_users.unblock.button.${i + 1}`}
+                      >
+                        <Unlock className="w-4 h-4 mr-1" /> Unblock
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>

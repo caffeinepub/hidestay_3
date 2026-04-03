@@ -39,6 +39,16 @@ export interface Coordinates {
     lat: string;
     lang: string;
 }
+export interface Report {
+    id: bigint;
+    status: Variant_resolved_pending_dismissed;
+    targetPropertyId: bigint;
+    description: string;
+    reporterId: Principal;
+    timestamp: Time;
+    actionTaken?: string;
+    reason: string;
+}
 export interface http_header {
     value: string;
     name: string;
@@ -55,10 +65,12 @@ export interface UserApprovalInfo {
 export interface Property {
     id: bigint;
     title: string;
+    verified: boolean;
     owner: Principal;
     description: string;
     amenities: Array<string>;
     availableFrom: Time;
+    viewCount: bigint;
     approved: boolean;
     genderPreference: Variant_boys_unisex_girls;
     address: Address;
@@ -86,6 +98,14 @@ export interface Notification {
     isRead: boolean;
     message: string;
     timestamp: Time;
+}
+export interface Announcement {
+    id: bigint;
+    title: string;
+    expiresAt?: Time;
+    createdAt: Time;
+    isActive: boolean;
+    message: string;
 }
 export interface Booking {
     id: bigint;
@@ -180,27 +200,52 @@ export enum Variant_rejected_accepted {
     rejected = "rejected",
     accepted = "accepted"
 }
+export enum Variant_resolved_pending_dismissed {
+    resolved = "resolved",
+    pending = "pending",
+    dismissed = "dismissed"
+}
 export interface backendInterface {
     addReview(propertyId: bigint, rating: bigint, comment: string): Promise<void>;
     addToWishlist(propertyId: bigint): Promise<void>;
     approveProperty(propertyId: bigint): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
+    blockUser(user: Principal): Promise<void>;
     bookProperty(booking: Booking): Promise<void>;
+    createAnnouncement(title: string, message: string, expiresAt: Time | null): Promise<void>;
     createCheckoutSession(items: Array<ShoppingItem>, successUrl: string, cancelUrl: string): Promise<string>;
     createInquiry(propertyId: bigint, studentName: string, studentPhone: string, inquiryType: Variant_bookVisit_contactOwner, message: string): Promise<void>;
+    deactivateAnnouncement(announcementId: bigint): Promise<void>;
     deleteProperty(propertyId: bigint): Promise<void>;
     deleteReview(propertyId: bigint, reviewer: Principal): Promise<void>;
+    dismissReport(reportId: bigint): Promise<void>;
+    getActiveAnnouncements(): Promise<Array<Announcement>>;
     getAllInquiries(): Promise<Array<Inquiry>>;
+    getAnalyticsSummary(): Promise<{
+        pendingListings: bigint;
+        totalProperties: bigint;
+        activeListings: bigint;
+        totalReports: bigint;
+        totalBookings: bigint;
+        totalUsers: bigint;
+        totalInquiries: bigint;
+    }>;
     getApprovedProperties(): Promise<Array<Property>>;
     getBookings(): Promise<Array<Booking>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
+    getDailyActiveUserCounts(): Promise<Array<{
+        date: string;
+        count: bigint;
+    }>>;
     getOwnerInquiries(): Promise<Array<Inquiry>>;
     getOwnerNotifications(): Promise<Array<Notification>>;
     getProperties(): Promise<Array<Property>>;
     getProperty(id: bigint): Promise<Property | null>;
     getPropertyBookings(propertyId: bigint): Promise<Array<Booking>>;
+    getReports(): Promise<Array<Report>>;
     getReviews(propertyId: bigint): Promise<Array<Review>>;
+    getStripePayments(): Promise<string>;
     getStripeSessionStatus(sessionId: string): Promise<StripeSessionStatus>;
     getUnreadNotificationCount(): Promise<bigint>;
     getUserBookings(user: Principal): Promise<Array<Booking>>;
@@ -209,16 +254,23 @@ export interface backendInterface {
     isCallerAdmin(): Promise<boolean>;
     isCallerApproved(): Promise<boolean>;
     isStripeConfigured(): Promise<boolean>;
+    isUserBlocked(user: Principal): Promise<boolean>;
     listApprovals(): Promise<Array<UserApprovalInfo>>;
     listProperty(property: Property): Promise<void>;
     markAllNotificationsRead(): Promise<void>;
     markNotificationRead(notificationId: bigint): Promise<void>;
     removeFromWishlist(propertyId: bigint): Promise<void>;
     requestApproval(): Promise<void>;
+    resolveReport(reportId: bigint, actionTaken: string): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     setApproval(user: Principal, status: ApprovalStatus): Promise<void>;
     setStripeConfiguration(config: StripeConfiguration): Promise<void>;
+    submitReport(targetPropertyId: bigint, reason: string, description: string): Promise<void>;
+    trackActivity(): Promise<void>;
+    trackPropertyView(propertyId: bigint): Promise<void>;
     transform(input: TransformationInput): Promise<TransformationOutput>;
+    unblockUser(user: Principal): Promise<void>;
     updateInquiryStatus(inquiryId: bigint, status: Variant_rejected_accepted): Promise<void>;
     updateProperty(propertyId: bigint, property: Property): Promise<void>;
+    verifyProperty(propertyId: bigint): Promise<void>;
 }

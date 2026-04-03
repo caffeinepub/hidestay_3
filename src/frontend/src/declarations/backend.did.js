@@ -53,6 +53,14 @@ export const ShoppingItem = IDL.Record({
   'priceInCents' : IDL.Nat,
   'productDescription' : IDL.Text,
 });
+export const Announcement = IDL.Record({
+  'id' : IDL.Nat,
+  'title' : IDL.Text,
+  'expiresAt' : IDL.Opt(Time),
+  'createdAt' : Time,
+  'isActive' : IDL.Bool,
+  'message' : IDL.Text,
+});
 export const Inquiry = IDL.Record({
   'id' : IDL.Nat,
   'status' : IDL.Variant({
@@ -84,10 +92,12 @@ export const Coordinates = IDL.Record({ 'lat' : IDL.Text, 'lang' : IDL.Text });
 export const Property = IDL.Record({
   'id' : IDL.Nat,
   'title' : IDL.Text,
+  'verified' : IDL.Bool,
   'owner' : IDL.Principal,
   'description' : IDL.Text,
   'amenities' : IDL.Vec(IDL.Text),
   'availableFrom' : Time,
+  'viewCount' : IDL.Nat,
   'approved' : IDL.Bool,
   'genderPreference' : IDL.Variant({
     'boys' : IDL.Null,
@@ -122,6 +132,20 @@ export const Notification = IDL.Record({
   'isRead' : IDL.Bool,
   'message' : IDL.Text,
   'timestamp' : Time,
+});
+export const Report = IDL.Record({
+  'id' : IDL.Nat,
+  'status' : IDL.Variant({
+    'resolved' : IDL.Null,
+    'pending' : IDL.Null,
+    'dismissed' : IDL.Null,
+  }),
+  'targetPropertyId' : IDL.Nat,
+  'description' : IDL.Text,
+  'reporterId' : IDL.Principal,
+  'timestamp' : Time,
+  'actionTaken' : IDL.Opt(IDL.Text),
+  'reason' : IDL.Text,
 });
 export const Review = IDL.Record({
   'propertyId' : IDL.Nat,
@@ -201,7 +225,9 @@ export const idlService = IDL.Service({
   'addToWishlist' : IDL.Func([IDL.Nat], [], []),
   'approveProperty' : IDL.Func([IDL.Nat], [], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+  'blockUser' : IDL.Func([IDL.Principal], [], []),
   'bookProperty' : IDL.Func([Booking], [], []),
+  'createAnnouncement' : IDL.Func([IDL.Text, IDL.Text, IDL.Opt(Time)], [], []),
   'createCheckoutSession' : IDL.Func(
       [IDL.Vec(ShoppingItem), IDL.Text, IDL.Text],
       [IDL.Text],
@@ -218,19 +244,44 @@ export const idlService = IDL.Service({
       [],
       [],
     ),
+  'deactivateAnnouncement' : IDL.Func([IDL.Nat], [], []),
   'deleteProperty' : IDL.Func([IDL.Nat], [], []),
   'deleteReview' : IDL.Func([IDL.Nat, IDL.Principal], [], []),
+  'dismissReport' : IDL.Func([IDL.Nat], [], []),
+  'getActiveAnnouncements' : IDL.Func([], [IDL.Vec(Announcement)], ['query']),
   'getAllInquiries' : IDL.Func([], [IDL.Vec(Inquiry)], ['query']),
+  'getAnalyticsSummary' : IDL.Func(
+      [],
+      [
+        IDL.Record({
+          'pendingListings' : IDL.Nat,
+          'totalProperties' : IDL.Nat,
+          'activeListings' : IDL.Nat,
+          'totalReports' : IDL.Nat,
+          'totalBookings' : IDL.Nat,
+          'totalUsers' : IDL.Nat,
+          'totalInquiries' : IDL.Nat,
+        }),
+      ],
+      ['query'],
+    ),
   'getApprovedProperties' : IDL.Func([], [IDL.Vec(Property)], ['query']),
   'getBookings' : IDL.Func([], [IDL.Vec(Booking)], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+  'getDailyActiveUserCounts' : IDL.Func(
+      [],
+      [IDL.Vec(IDL.Record({ 'date' : IDL.Text, 'count' : IDL.Nat }))],
+      ['query'],
+    ),
   'getOwnerInquiries' : IDL.Func([], [IDL.Vec(Inquiry)], ['query']),
   'getOwnerNotifications' : IDL.Func([], [IDL.Vec(Notification)], ['query']),
   'getProperties' : IDL.Func([], [IDL.Vec(Property)], ['query']),
   'getProperty' : IDL.Func([IDL.Nat], [IDL.Opt(Property)], ['query']),
   'getPropertyBookings' : IDL.Func([IDL.Nat], [IDL.Vec(Booking)], ['query']),
+  'getReports' : IDL.Func([], [IDL.Vec(Report)], ['query']),
   'getReviews' : IDL.Func([IDL.Nat], [IDL.Vec(Review)], ['query']),
+  'getStripePayments' : IDL.Func([], [IDL.Text], []),
   'getStripeSessionStatus' : IDL.Func([IDL.Text], [StripeSessionStatus], []),
   'getUnreadNotificationCount' : IDL.Func([], [IDL.Nat], ['query']),
   'getUserBookings' : IDL.Func([IDL.Principal], [IDL.Vec(Booking)], ['query']),
@@ -243,26 +294,33 @@ export const idlService = IDL.Service({
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'isCallerApproved' : IDL.Func([], [IDL.Bool], ['query']),
   'isStripeConfigured' : IDL.Func([], [IDL.Bool], ['query']),
+  'isUserBlocked' : IDL.Func([IDL.Principal], [IDL.Bool], ['query']),
   'listApprovals' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
   'listProperty' : IDL.Func([Property], [], []),
   'markAllNotificationsRead' : IDL.Func([], [], []),
   'markNotificationRead' : IDL.Func([IDL.Nat], [], []),
   'removeFromWishlist' : IDL.Func([IDL.Nat], [], []),
   'requestApproval' : IDL.Func([], [], []),
+  'resolveReport' : IDL.Func([IDL.Nat, IDL.Text], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'setApproval' : IDL.Func([IDL.Principal, ApprovalStatus], [], []),
   'setStripeConfiguration' : IDL.Func([StripeConfiguration], [], []),
+  'submitReport' : IDL.Func([IDL.Nat, IDL.Text, IDL.Text], [], []),
+  'trackActivity' : IDL.Func([], [], []),
+  'trackPropertyView' : IDL.Func([IDL.Nat], [], []),
   'transform' : IDL.Func(
       [TransformationInput],
       [TransformationOutput],
       ['query'],
     ),
+  'unblockUser' : IDL.Func([IDL.Principal], [], []),
   'updateInquiryStatus' : IDL.Func(
       [IDL.Nat, IDL.Variant({ 'rejected' : IDL.Null, 'accepted' : IDL.Null })],
       [],
       [],
     ),
   'updateProperty' : IDL.Func([IDL.Nat, Property], [], []),
+  'verifyProperty' : IDL.Func([IDL.Nat], [], []),
 });
 
 export const idlInitArgs = [];
@@ -313,6 +371,14 @@ export const idlFactory = ({ IDL }) => {
     'priceInCents' : IDL.Nat,
     'productDescription' : IDL.Text,
   });
+  const Announcement = IDL.Record({
+    'id' : IDL.Nat,
+    'title' : IDL.Text,
+    'expiresAt' : IDL.Opt(Time),
+    'createdAt' : Time,
+    'isActive' : IDL.Bool,
+    'message' : IDL.Text,
+  });
   const Inquiry = IDL.Record({
     'id' : IDL.Nat,
     'status' : IDL.Variant({
@@ -344,10 +410,12 @@ export const idlFactory = ({ IDL }) => {
   const Property = IDL.Record({
     'id' : IDL.Nat,
     'title' : IDL.Text,
+    'verified' : IDL.Bool,
     'owner' : IDL.Principal,
     'description' : IDL.Text,
     'amenities' : IDL.Vec(IDL.Text),
     'availableFrom' : Time,
+    'viewCount' : IDL.Nat,
     'approved' : IDL.Bool,
     'genderPreference' : IDL.Variant({
       'boys' : IDL.Null,
@@ -382,6 +450,20 @@ export const idlFactory = ({ IDL }) => {
     'isRead' : IDL.Bool,
     'message' : IDL.Text,
     'timestamp' : Time,
+  });
+  const Report = IDL.Record({
+    'id' : IDL.Nat,
+    'status' : IDL.Variant({
+      'resolved' : IDL.Null,
+      'pending' : IDL.Null,
+      'dismissed' : IDL.Null,
+    }),
+    'targetPropertyId' : IDL.Nat,
+    'description' : IDL.Text,
+    'reporterId' : IDL.Principal,
+    'timestamp' : Time,
+    'actionTaken' : IDL.Opt(IDL.Text),
+    'reason' : IDL.Text,
   });
   const Review = IDL.Record({
     'propertyId' : IDL.Nat,
@@ -458,7 +540,13 @@ export const idlFactory = ({ IDL }) => {
     'addToWishlist' : IDL.Func([IDL.Nat], [], []),
     'approveProperty' : IDL.Func([IDL.Nat], [], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+    'blockUser' : IDL.Func([IDL.Principal], [], []),
     'bookProperty' : IDL.Func([Booking], [], []),
+    'createAnnouncement' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Opt(Time)],
+        [],
+        [],
+      ),
     'createCheckoutSession' : IDL.Func(
         [IDL.Vec(ShoppingItem), IDL.Text, IDL.Text],
         [IDL.Text],
@@ -475,19 +563,44 @@ export const idlFactory = ({ IDL }) => {
         [],
         [],
       ),
+    'deactivateAnnouncement' : IDL.Func([IDL.Nat], [], []),
     'deleteProperty' : IDL.Func([IDL.Nat], [], []),
     'deleteReview' : IDL.Func([IDL.Nat, IDL.Principal], [], []),
+    'dismissReport' : IDL.Func([IDL.Nat], [], []),
+    'getActiveAnnouncements' : IDL.Func([], [IDL.Vec(Announcement)], ['query']),
     'getAllInquiries' : IDL.Func([], [IDL.Vec(Inquiry)], ['query']),
+    'getAnalyticsSummary' : IDL.Func(
+        [],
+        [
+          IDL.Record({
+            'pendingListings' : IDL.Nat,
+            'totalProperties' : IDL.Nat,
+            'activeListings' : IDL.Nat,
+            'totalReports' : IDL.Nat,
+            'totalBookings' : IDL.Nat,
+            'totalUsers' : IDL.Nat,
+            'totalInquiries' : IDL.Nat,
+          }),
+        ],
+        ['query'],
+      ),
     'getApprovedProperties' : IDL.Func([], [IDL.Vec(Property)], ['query']),
     'getBookings' : IDL.Func([], [IDL.Vec(Booking)], ['query']),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+    'getDailyActiveUserCounts' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Record({ 'date' : IDL.Text, 'count' : IDL.Nat }))],
+        ['query'],
+      ),
     'getOwnerInquiries' : IDL.Func([], [IDL.Vec(Inquiry)], ['query']),
     'getOwnerNotifications' : IDL.Func([], [IDL.Vec(Notification)], ['query']),
     'getProperties' : IDL.Func([], [IDL.Vec(Property)], ['query']),
     'getProperty' : IDL.Func([IDL.Nat], [IDL.Opt(Property)], ['query']),
     'getPropertyBookings' : IDL.Func([IDL.Nat], [IDL.Vec(Booking)], ['query']),
+    'getReports' : IDL.Func([], [IDL.Vec(Report)], ['query']),
     'getReviews' : IDL.Func([IDL.Nat], [IDL.Vec(Review)], ['query']),
+    'getStripePayments' : IDL.Func([], [IDL.Text], []),
     'getStripeSessionStatus' : IDL.Func([IDL.Text], [StripeSessionStatus], []),
     'getUnreadNotificationCount' : IDL.Func([], [IDL.Nat], ['query']),
     'getUserBookings' : IDL.Func(
@@ -504,20 +617,26 @@ export const idlFactory = ({ IDL }) => {
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'isCallerApproved' : IDL.Func([], [IDL.Bool], ['query']),
     'isStripeConfigured' : IDL.Func([], [IDL.Bool], ['query']),
+    'isUserBlocked' : IDL.Func([IDL.Principal], [IDL.Bool], ['query']),
     'listApprovals' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
     'listProperty' : IDL.Func([Property], [], []),
     'markAllNotificationsRead' : IDL.Func([], [], []),
     'markNotificationRead' : IDL.Func([IDL.Nat], [], []),
     'removeFromWishlist' : IDL.Func([IDL.Nat], [], []),
     'requestApproval' : IDL.Func([], [], []),
+    'resolveReport' : IDL.Func([IDL.Nat, IDL.Text], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'setApproval' : IDL.Func([IDL.Principal, ApprovalStatus], [], []),
     'setStripeConfiguration' : IDL.Func([StripeConfiguration], [], []),
+    'submitReport' : IDL.Func([IDL.Nat, IDL.Text, IDL.Text], [], []),
+    'trackActivity' : IDL.Func([], [], []),
+    'trackPropertyView' : IDL.Func([IDL.Nat], [], []),
     'transform' : IDL.Func(
         [TransformationInput],
         [TransformationOutput],
         ['query'],
       ),
+    'unblockUser' : IDL.Func([IDL.Principal], [], []),
     'updateInquiryStatus' : IDL.Func(
         [
           IDL.Nat,
@@ -527,6 +646,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'updateProperty' : IDL.Func([IDL.Nat, Property], [], []),
+    'verifyProperty' : IDL.Func([IDL.Nat], [], []),
   });
 };
 

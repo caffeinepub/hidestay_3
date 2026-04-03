@@ -18,6 +18,14 @@ export interface Address {
   'state' : string,
   'bluenumber' : string,
 }
+export interface Announcement {
+  'id' : bigint,
+  'title' : string,
+  'expiresAt' : [] | [Time],
+  'createdAt' : Time,
+  'isActive' : boolean,
+  'message' : string,
+}
 export type ApprovalStatus = { 'pending' : null } |
   { 'approved' : null } |
   { 'rejected' : null };
@@ -63,10 +71,12 @@ export interface Notification {
 export interface Property {
   'id' : bigint,
   'title' : string,
+  'verified' : boolean,
   'owner' : Principal,
   'description' : string,
   'amenities' : Array<string>,
   'availableFrom' : Time,
+  'viewCount' : bigint,
   'approved' : boolean,
   'genderPreference' : { 'boys' : null } |
     { 'unisex' : null } |
@@ -79,6 +89,18 @@ export interface Property {
   'photos' : Array<ExternalBlob>,
   'coordinates' : Coordinates,
   'contactPhone' : string,
+}
+export interface Report {
+  'id' : bigint,
+  'status' : { 'resolved' : null } |
+    { 'pending' : null } |
+    { 'dismissed' : null },
+  'targetPropertyId' : bigint,
+  'description' : string,
+  'reporterId' : Principal,
+  'timestamp' : Time,
+  'actionTaken' : [] | [string],
+  'reason' : string,
 }
 export interface Review {
   'propertyId' : bigint,
@@ -165,7 +187,9 @@ export interface _SERVICE {
   'addToWishlist' : ActorMethod<[bigint], undefined>,
   'approveProperty' : ActorMethod<[bigint], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'blockUser' : ActorMethod<[Principal], undefined>,
   'bookProperty' : ActorMethod<[Booking], undefined>,
+  'createAnnouncement' : ActorMethod<[string, string, [] | [Time]], undefined>,
   'createCheckoutSession' : ActorMethod<
     [Array<ShoppingItem>, string, string],
     string
@@ -181,19 +205,40 @@ export interface _SERVICE {
     ],
     undefined
   >,
+  'deactivateAnnouncement' : ActorMethod<[bigint], undefined>,
   'deleteProperty' : ActorMethod<[bigint], undefined>,
   'deleteReview' : ActorMethod<[bigint, Principal], undefined>,
+  'dismissReport' : ActorMethod<[bigint], undefined>,
+  'getActiveAnnouncements' : ActorMethod<[], Array<Announcement>>,
   'getAllInquiries' : ActorMethod<[], Array<Inquiry>>,
+  'getAnalyticsSummary' : ActorMethod<
+    [],
+    {
+      'pendingListings' : bigint,
+      'totalProperties' : bigint,
+      'activeListings' : bigint,
+      'totalReports' : bigint,
+      'totalBookings' : bigint,
+      'totalUsers' : bigint,
+      'totalInquiries' : bigint,
+    }
+  >,
   'getApprovedProperties' : ActorMethod<[], Array<Property>>,
   'getBookings' : ActorMethod<[], Array<Booking>>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
+  'getDailyActiveUserCounts' : ActorMethod<
+    [],
+    Array<{ 'date' : string, 'count' : bigint }>
+  >,
   'getOwnerInquiries' : ActorMethod<[], Array<Inquiry>>,
   'getOwnerNotifications' : ActorMethod<[], Array<Notification>>,
   'getProperties' : ActorMethod<[], Array<Property>>,
   'getProperty' : ActorMethod<[bigint], [] | [Property]>,
   'getPropertyBookings' : ActorMethod<[bigint], Array<Booking>>,
+  'getReports' : ActorMethod<[], Array<Report>>,
   'getReviews' : ActorMethod<[bigint], Array<Review>>,
+  'getStripePayments' : ActorMethod<[], string>,
   'getStripeSessionStatus' : ActorMethod<[string], StripeSessionStatus>,
   'getUnreadNotificationCount' : ActorMethod<[], bigint>,
   'getUserBookings' : ActorMethod<[Principal], Array<Booking>>,
@@ -202,21 +247,28 @@ export interface _SERVICE {
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'isCallerApproved' : ActorMethod<[], boolean>,
   'isStripeConfigured' : ActorMethod<[], boolean>,
+  'isUserBlocked' : ActorMethod<[Principal], boolean>,
   'listApprovals' : ActorMethod<[], Array<UserApprovalInfo>>,
   'listProperty' : ActorMethod<[Property], undefined>,
   'markAllNotificationsRead' : ActorMethod<[], undefined>,
   'markNotificationRead' : ActorMethod<[bigint], undefined>,
   'removeFromWishlist' : ActorMethod<[bigint], undefined>,
   'requestApproval' : ActorMethod<[], undefined>,
+  'resolveReport' : ActorMethod<[bigint, string], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'setApproval' : ActorMethod<[Principal, ApprovalStatus], undefined>,
   'setStripeConfiguration' : ActorMethod<[StripeConfiguration], undefined>,
+  'submitReport' : ActorMethod<[bigint, string, string], undefined>,
+  'trackActivity' : ActorMethod<[], undefined>,
+  'trackPropertyView' : ActorMethod<[bigint], undefined>,
   'transform' : ActorMethod<[TransformationInput], TransformationOutput>,
+  'unblockUser' : ActorMethod<[Principal], undefined>,
   'updateInquiryStatus' : ActorMethod<
     [bigint, { 'rejected' : null } | { 'accepted' : null }],
     undefined
   >,
   'updateProperty' : ActorMethod<[bigint, Property], undefined>,
+  'verifyProperty' : ActorMethod<[bigint], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

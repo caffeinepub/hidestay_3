@@ -10,11 +10,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Link } from "@tanstack/react-router";
-import { Building2, CheckCircle2 } from "lucide-react";
+import { Building2, CheckCircle2, ShieldCheck, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Variant_apartment_sharedRoom_single } from "../../backend";
 import RouteGuard from "../../components/RouteGuard";
-import { useAllProperties, useApproveProperty } from "../../hooks/useQueries";
+import {
+  useAllProperties,
+  useApproveProperty,
+  useDeleteProperty,
+  useVerifyProperty,
+} from "../../hooks/useQueries";
 
 const roomTypeLabels: Record<Variant_apartment_sharedRoom_single, string> = {
   [Variant_apartment_sharedRoom_single.apartment]: "Apartment",
@@ -33,6 +39,10 @@ export default function AdminListingsPage() {
 function AdminListingsInner() {
   const { data: properties, isLoading } = useAllProperties();
   const approveProperty = useApproveProperty();
+  const verifyProperty = useVerifyProperty();
+  const deleteProperty = useDeleteProperty();
+
+  const [confirmDeleteId, setConfirmDeleteId] = useState<bigint | null>(null);
 
   const handleApprove = async (id: bigint) => {
     try {
@@ -43,6 +53,25 @@ function AdminListingsInner() {
     }
   };
 
+  const handleVerify = async (id: bigint) => {
+    try {
+      await verifyProperty.mutateAsync(id);
+      toast.success("Property verified!");
+    } catch {
+      toast.error("Failed to verify property.");
+    }
+  };
+
+  const handleDelete = async (id: bigint) => {
+    try {
+      await deleteProperty.mutateAsync(id);
+      toast.success("Property removed.");
+      setConfirmDeleteId(null);
+    } catch {
+      toast.error("Failed to remove property.");
+    }
+  };
+
   return (
     <div className="container max-w-7xl mx-auto px-4 py-10">
       <div className="mb-8">
@@ -50,7 +79,7 @@ function AdminListingsInner() {
           Listings Management
         </h1>
         <p className="text-muted-foreground">
-          Review, approve, and manage all property listings
+          Review, approve, verify, and manage all property listings
         </p>
       </div>
 
@@ -120,24 +149,34 @@ function AdminListingsInner() {
                     {p.owner.toString().slice(0, 10)}...
                   </TableCell>
                   <TableCell>
-                    {p.approved ? (
-                      <Badge
-                        className="bg-green-100 text-green-700 border-green-200 border"
-                        variant="outline"
-                      >
-                        Approved
-                      </Badge>
-                    ) : (
-                      <Badge
-                        className="bg-yellow-100 text-yellow-700 border-yellow-200 border"
-                        variant="outline"
-                      >
-                        Pending
-                      </Badge>
-                    )}
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {p.approved ? (
+                        <Badge
+                          className="bg-green-100 text-green-700 border-green-200 border"
+                          variant="outline"
+                        >
+                          Approved
+                        </Badge>
+                      ) : (
+                        <Badge
+                          className="bg-yellow-100 text-yellow-700 border-yellow-200 border"
+                          variant="outline"
+                        >
+                          Pending
+                        </Badge>
+                      )}
+                      {p.verified && (
+                        <Badge
+                          className="bg-blue-100 text-blue-700 border-blue-200 border"
+                          variant="outline"
+                        >
+                          <ShieldCheck className="w-3 h-3 mr-1" /> Verified
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex items-center justify-end gap-2 flex-wrap">
                       {!p.approved && (
                         <Button
                           size="sm"
@@ -146,6 +185,56 @@ function AdminListingsInner() {
                           data-ocid={`admin_listings.approve.button.${i + 1}`}
                         >
                           <CheckCircle2 className="w-4 h-4 mr-1" /> Approve
+                        </Button>
+                      )}
+                      {!p.verified ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleVerify(p.id)}
+                          disabled={verifyProperty.isPending}
+                          data-ocid={`admin_listings.verify.button.${i + 1}`}
+                        >
+                          <ShieldCheck className="w-4 h-4 mr-1" /> Verify
+                        </Button>
+                      ) : (
+                        <Badge
+                          className="bg-blue-50 text-blue-600 border-blue-200 border"
+                          variant="outline"
+                        >
+                          <ShieldCheck className="w-3 h-3 mr-1" /> Verified
+                        </Badge>
+                      )}
+                      {confirmDeleteId === p.id ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleDelete(p.id)}
+                            disabled={deleteProperty.isPending}
+                            data-ocid={`admin_listings.confirm.button.${i + 1}`}
+                          >
+                            {deleteProperty.isPending
+                              ? "Removing..."
+                              : "Confirm"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setConfirmDeleteId(null)}
+                            data-ocid={`admin_listings.cancel.button.${i + 1}`}
+                          >
+                            Cancel
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => setConfirmDeleteId(p.id)}
+                          data-ocid={`admin_listings.delete_button.${i + 1}`}
+                        >
+                          <Trash2 className="w-4 h-4 mr-1" /> Remove
                         </Button>
                       )}
                     </div>

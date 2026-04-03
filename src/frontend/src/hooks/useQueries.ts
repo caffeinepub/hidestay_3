@@ -1,10 +1,12 @@
 import type { Principal } from "@icp-sdk/core/principal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
+  Announcement,
   Booking,
   Inquiry,
   Notification,
   Property,
+  Report,
   ShoppingItem,
   StripeConfiguration,
   UserApprovalInfo,
@@ -24,6 +26,11 @@ export interface Review {
   rating: bigint;
   comment: string;
   timestamp: bigint;
+}
+
+export interface DailyActiveUserCount {
+  date: string;
+  count: bigint;
 }
 
 // === Auth / Profile ===
@@ -518,5 +525,226 @@ export function useDeleteProperty() {
       qc.invalidateQueries({ queryKey: ["allProperties"] });
       qc.invalidateQueries({ queryKey: ["approvedProperties"] });
     },
+  });
+}
+
+// === Block / Unblock Users ===
+export function useBlockUser() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (user: Principal) => {
+      if (!actor) throw new Error("Not connected");
+      await actor.blockUser(user);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["approvals"] });
+    },
+  });
+}
+
+export function useUnblockUser() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (user: Principal) => {
+      if (!actor) throw new Error("Not connected");
+      await actor.unblockUser(user);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["approvals"] });
+    },
+  });
+}
+
+// === Verify Property ===
+export function useVerifyProperty() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (propertyId: bigint) => {
+      if (!actor) throw new Error("Not connected");
+      await actor.verifyProperty(propertyId);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["allProperties"] });
+      qc.invalidateQueries({ queryKey: ["approvedProperties"] });
+    },
+  });
+}
+
+// === Reports ===
+export function useSubmitReport() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      targetPropertyId,
+      reason,
+      description,
+    }: {
+      targetPropertyId: bigint;
+      reason: string;
+      description: string;
+    }) => {
+      if (!actor) throw new Error("Not connected");
+      await actor.submitReport(targetPropertyId, reason, description);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["reports"] });
+    },
+  });
+}
+
+export function useGetReports() {
+  const { actor, isFetching } = useActor();
+  return useQuery<Report[]>({
+    queryKey: ["reports"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getReports();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useResolveReport() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      reportId,
+      actionTaken,
+    }: {
+      reportId: bigint;
+      actionTaken: string;
+    }) => {
+      if (!actor) throw new Error("Not connected");
+      await actor.resolveReport(reportId, actionTaken);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["reports"] });
+    },
+  });
+}
+
+export function useDismissReport() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (reportId: bigint) => {
+      if (!actor) throw new Error("Not connected");
+      await actor.dismissReport(reportId);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["reports"] });
+    },
+  });
+}
+
+// === Announcements ===
+export function useCreateAnnouncement() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      title,
+      message,
+      expiresAt,
+    }: {
+      title: string;
+      message: string;
+      expiresAt: bigint | null;
+    }) => {
+      if (!actor) throw new Error("Not connected");
+      await actor.createAnnouncement(title, message, expiresAt);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["activeAnnouncements"] });
+    },
+  });
+}
+
+export function useGetActiveAnnouncements() {
+  const { actor, isFetching } = useActor();
+  return useQuery<Announcement[]>({
+    queryKey: ["activeAnnouncements"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getActiveAnnouncements();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useDeactivateAnnouncement() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: bigint) => {
+      if (!actor) throw new Error("Not connected");
+      await actor.deactivateAnnouncement(id);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["activeAnnouncements"] });
+    },
+  });
+}
+
+// === Analytics ===
+export function useAnalyticsSummary() {
+  const { actor, isFetching } = useActor();
+  return useQuery<{
+    pendingListings: bigint;
+    totalProperties: bigint;
+    activeListings: bigint;
+    totalReports: bigint;
+    totalBookings: bigint;
+    totalUsers: bigint;
+    totalInquiries: bigint;
+  } | null>({
+    queryKey: ["analyticsSummary"],
+    queryFn: async () => {
+      if (!actor) return null;
+      return actor.getAnalyticsSummary();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useTrackPropertyView() {
+  const { actor } = useActor();
+  return useMutation({
+    mutationFn: async (propertyId: bigint) => {
+      if (!actor) throw new Error("Not connected");
+      await actor.trackPropertyView(propertyId);
+    },
+  });
+}
+
+export function useGetDailyActiveUserCounts() {
+  const { actor, isFetching } = useActor();
+  return useQuery<DailyActiveUserCount[]>({
+    queryKey: ["dailyActiveUsers"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getDailyActiveUserCounts() as Promise<
+        DailyActiveUserCount[]
+      >;
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useGetStripePayments() {
+  const { actor, isFetching } = useActor();
+  return useQuery<string>({
+    queryKey: ["stripePayments"],
+    queryFn: async () => {
+      if (!actor) return "";
+      return actor.getStripePayments();
+    },
+    enabled: !!actor && !isFetching,
+    staleTime: 0,
   });
 }
