@@ -2,15 +2,20 @@ import type { Principal } from "@icp-sdk/core/principal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   Booking,
+  Inquiry,
+  Notification,
   Property,
   ShoppingItem,
   StripeConfiguration,
   UserApprovalInfo,
   UserProfile,
 } from "../backend";
-import { type ApprovalStatus, Variant_admin_owner_student } from "../backend";
+import type {
+  ApprovalStatus,
+  Variant_bookVisit_contactOwner,
+  Variant_rejected_accepted,
+} from "../backend";
 import { useActor } from "./useActor";
-import { useInternetIdentity } from "./useInternetIdentity";
 
 // Review type (defined locally as it may not be exported from backend.ts)
 export interface Review {
@@ -375,6 +380,143 @@ export function useDeleteReview() {
       qc.invalidateQueries({
         queryKey: ["reviews", variables.propertyId.toString()],
       });
+    },
+  });
+}
+
+// === Inquiries ===
+export function useOwnerInquiries() {
+  const { actor, isFetching } = useActor();
+  return useQuery<Inquiry[]>({
+    queryKey: ["ownerInquiries"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getOwnerInquiries();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useCreateInquiry() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      propertyId,
+      studentName,
+      studentPhone,
+      inquiryType,
+      message,
+    }: {
+      propertyId: bigint;
+      studentName: string;
+      studentPhone: string;
+      inquiryType: Variant_bookVisit_contactOwner;
+      message: string;
+    }) => {
+      if (!actor) throw new Error("Not connected");
+      await actor.createInquiry(
+        propertyId,
+        studentName,
+        studentPhone,
+        inquiryType,
+        message,
+      );
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ownerInquiries"] });
+    },
+  });
+}
+
+export function useUpdateInquiryStatus() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      inquiryId,
+      status,
+    }: {
+      inquiryId: bigint;
+      status: Variant_rejected_accepted;
+    }) => {
+      if (!actor) throw new Error("Not connected");
+      await actor.updateInquiryStatus(inquiryId, status);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ownerInquiries"] });
+    },
+  });
+}
+
+// === Notifications ===
+export function useOwnerNotifications() {
+  const { actor, isFetching } = useActor();
+  return useQuery<Notification[]>({
+    queryKey: ["ownerNotifications"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getOwnerNotifications();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useUnreadNotificationCount() {
+  const { actor, isFetching } = useActor();
+  return useQuery<bigint>({
+    queryKey: ["unreadNotificationCount"],
+    queryFn: async () => {
+      if (!actor) return BigInt(0);
+      return actor.getUnreadNotificationCount();
+    },
+    enabled: !!actor && !isFetching,
+    refetchInterval: 30000,
+  });
+}
+
+export function useMarkNotificationRead() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (notificationId: bigint) => {
+      if (!actor) throw new Error("Not connected");
+      await actor.markNotificationRead(notificationId);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ownerNotifications"] });
+      qc.invalidateQueries({ queryKey: ["unreadNotificationCount"] });
+    },
+  });
+}
+
+export function useMarkAllNotificationsRead() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("Not connected");
+      await actor.markAllNotificationsRead();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ownerNotifications"] });
+      qc.invalidateQueries({ queryKey: ["unreadNotificationCount"] });
+    },
+  });
+}
+
+// === Delete Property ===
+export function useDeleteProperty() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (propertyId: bigint) => {
+      if (!actor) throw new Error("Not connected");
+      await actor.deleteProperty(propertyId);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["allProperties"] });
+      qc.invalidateQueries({ queryKey: ["approvedProperties"] });
     },
   });
 }

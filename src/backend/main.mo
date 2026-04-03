@@ -7,7 +7,6 @@ import Runtime "mo:core/Runtime";
 import Principal "mo:core/Principal";
 import Iter "mo:core/Iter";
 
-
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
 import Stripe "stripe/stripe";
@@ -114,6 +113,35 @@ actor {
 
   var nextPropertyId = 0;
   var nextBookingId = 0;
+
+  // Inquiry type
+  public type Inquiry = {
+    id : Nat;
+    propertyId : Nat;
+    studentPrincipal : Principal;
+    studentName : Text;
+    studentPhone : Text;
+    inquiryType : { #bookVisit; #contactOwner };
+    status : { #pending; #accepted; #rejected };
+    timestamp : Time.Time;
+    message : Text;
+  };
+
+  let inquiriesList = Map.empty<Nat, Inquiry>();
+  var nextInquiryId = 0;
+
+  // Notification type
+  public type Notification = {
+    id : Nat;
+    ownerPrincipal : Principal;
+    message : Text;
+    timestamp : Time.Time;
+    isRead : Bool;
+    relatedInquiryId : ?Nat;
+  };
+
+  let notificationsList = Map.empty<Nat, Notification>();
+  var nextNotificationId = 0;
 
   // Stripe integration
   var configuration : ?Stripe.StripeConfiguration = null;
@@ -456,5 +484,174 @@ actor {
 
     let updatedReviews = existingReviews.filter(func(r : Review) : Bool { r.student != reviewer });
     reviewMap.add(propertyId, updatedReviews);
+  };
+
+  // Inquiry functions
+  public shared ({ caller }) func createInquiry(propertyId : Nat, studentName : Text, studentPhone : Text, inquiryType : { #bookVisit; #contactOwner }, message : Text) : async () {
+    // Only approved users can create inquiry
+    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only approved users can create inquiries");
+    };
+
+    // Verify property exists
+    let property = switch (propertyList.get(propertyId)) {
+      case (null) { Runtime.trap("Property not found") };
+      case (?property) { property };
+    };
+
+    // Create new inquiry
+    let inquiry : Inquiry = {
+      id = nextInquiryId;
+      propertyId;
+      studentPrincipal = caller;
+      studentName;
+      studentPhone;
+      inquiryType;
+      status = #pending; // New inquiries start as pending
+      timestamp = Time.now();
+      message;
+    };
+    inquiriesList.add(nextInquiryId, inquiry);
+
+    // Create notification for property owner
+    let notification : Notification = {
+      id = nextNotificationId;
+      ownerPrincipal = property.owner;
+      message = "New inquiry for your property - " # debug_show(inquiryType);
+      timestamp = Time.now();
+      isRead = false;
+      relatedInquiryId = ?nextInquiryId;
+    };
+
+    notificationsList.add(nextNotificationId, notification);
+
+    // Increment counters
+    nextInquiryId += 1;
+    nextNotificationId += 1;
+  };
+
+  public query ({ caller }) func getOwnerInquiries() : async [Inquiry] {
+    // Only authenticated users can view inquiries
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view inquiries");
+    };
+
+    // Return all inquiries for properties owned by caller (must be owner, not admin)
+    let ownedProperties = propertyList.filter(func(_id, prop) { prop.owner == caller });
+    let propertyIds = ownedProperties.keys().toArray();
+
+    let inquiries = inquiriesList.filter(
+      func(_id, inquiry) {
+        /* Checks if any propertyId in propertyIds matches inquiry.propertyId */
+        propertyIds.any<Nat>(func(id) { id == inquiry.propertyId });
+      }
+    );
+    inquiries.values().toArray();
+  };
+
+  public shared ({ caller }) func updateInquiryStatus(inquiryId : Nat, status : { #accepted; #rejected }) : async () {
+    let inquiry = switch (inquiriesList.get(inquiryId)) {
+      case (null) { Runtime.trap("Inquiry not found") };
+      case (?inquiry) { inquiry };
+    };
+
+    let property = switch (propertyList.get(inquiry.propertyId)) {
+      case (null) { Runtime.trap("Property not found") };
+      case (?property) { property };
+    };
+
+    // Only owner or admin can accept/reject inquiry
+    if (property.owner != caller and not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Can only update status of your own inquiries");
+    };
+
+    let updatedInquiry = { inquiry with status };
+    inquiriesList.add(inquiryId, updatedInquiry);
+  };
+
+  public query ({ caller }) func getAllInquiries() : async [Inquiry] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can view all inquiries");
+    };
+    inquiriesList.values().toArray();
+  };
+
+  // Notification functions
+  public query ({ caller }) func getOwnerNotifications() : async [Notification] {
+    // Only authenticated users can view notifications
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view notifications");
+    };
+
+    let notifications = notificationsList.filter(func(_, notification) { notification.ownerPrincipal == caller });
+    notifications.values().toArray();
+  };
+
+  public shared ({ caller }) func markAllNotificationsRead() : async () {
+    // Only authenticated users can mark notifications as read
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can mark notifications as read");
+    };
+
+    let updates = notificationsList.map<Nat, Notification, Notification>(
+      func(_id, notification) {
+        if (notification.ownerPrincipal == caller and not notification.isRead) {
+          { notification with isRead = true };
+        } else { notification };
+      }
+    );
+    notificationsList.clear();
+
+    // Fix: Add all entries from updates back to notificationsList
+    for ((key, value) in updates.entries()) {
+      notificationsList.add(key, value);
+    };
+  };
+
+  public shared ({ caller }) func markNotificationRead(notificationId : Nat) : async () {
+    // Only authenticated users can mark notifications as read
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can mark notifications as read");
+    };
+
+    let notification = switch (notificationsList.get(notificationId)) {
+      case (null) { return () };
+      case (?notification) { notification };
+    };
+
+    // Verify the notification belongs to the caller
+    if (notification.ownerPrincipal != caller) {
+      Runtime.trap("Unauthorized: Can only mark your own notifications as read");
+    };
+
+    if (not notification.isRead) {
+      notificationsList.add(notificationId, { notification with isRead = true });
+    };
+  };
+
+  public query ({ caller }) func getUnreadNotificationCount() : async Nat {
+    // Only authenticated users can get notification count
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view notification count");
+    };
+
+    let notifications = notificationsList.values().toArray();
+    let filteredNotifications = notifications.filter(
+      func(n) { n.ownerPrincipal == caller and not n.isRead }
+    );
+    filteredNotifications.size();
+  };
+
+  public shared ({ caller }) func deleteProperty(propertyId: Nat) : async () {
+    let property = switch (propertyList.get(propertyId)) {
+      case (null) { Runtime.trap("Property not found") };
+      case (?property) { property };
+    };
+    // Verify that only property owner or admin can delete property
+    if (property.owner != caller and not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Can only delete your own properties");
+    };
+    // Remove it from persistent storage
+    propertyList.remove(propertyId);
   };
 };

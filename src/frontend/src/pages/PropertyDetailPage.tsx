@@ -24,12 +24,14 @@ import { toast } from "sonner";
 import {
   Variant_admin_owner_student,
   Variant_apartment_sharedRoom_single,
+  Variant_bookVisit_contactOwner,
   Variant_boys_unisex_girls,
 } from "../backend";
 import { useAuth } from "../hooks/useAuth";
 import {
   useAddReview,
   useCallerProfile,
+  useCreateInquiry,
   useProperty,
   usePropertyReviews,
 } from "../hooks/useQueries";
@@ -125,7 +127,6 @@ function ReviewsSection({ propertyId }: { propertyId: bigint }) {
     profile?.role === Variant_admin_owner_student.student;
   const isLoggedIn = !!session;
 
-  // Use session phone as the user identifier (no Principal in session)
   const myReview = reviews?.find(
     (r) => r.student.toString().slice(-8) === session?.phone?.slice(-8),
   );
@@ -168,7 +169,6 @@ function ReviewsSection({ propertyId }: { propertyId: bigint }) {
         )}
       </h3>
 
-      {/* Review form for logged-in students */}
       {isLoggedIn && isStudent && (
         <div
           className="bg-card border border-border rounded-xl p-5 mb-6"
@@ -206,7 +206,6 @@ function ReviewsSection({ propertyId }: { propertyId: bigint }) {
         </div>
       )}
 
-      {/* Login prompt for non-students */}
       {!isLoggedIn && (
         <div className="text-sm text-muted-foreground bg-muted/40 rounded-xl px-4 py-3 mb-5">
           <a
@@ -219,7 +218,6 @@ function ReviewsSection({ propertyId }: { propertyId: bigint }) {
         </div>
       )}
 
-      {/* Reviews list */}
       {reviewsLoading ? (
         <div className="space-y-3" data-ocid="reviews.loading_state">
           {[1, 2].map((i) => (
@@ -290,6 +288,7 @@ export default function PropertyDetailPage() {
   const { data: profile } = useCallerProfile();
   const { data: property, isLoading } = useProperty(BigInt(id ?? "0"));
   const [photoIndex, setPhotoIndex] = useState(0);
+  const createInquiry = useCreateInquiry();
 
   const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist(
     session?.phone,
@@ -348,8 +347,28 @@ export default function PropertyDetailPage() {
       router.navigate({ to: "/auth/role" });
       return;
     }
+    if (session) {
+      createInquiry.mutate({
+        propertyId: property.id,
+        studentName: session.phone ?? "Student",
+        studentPhone: session.phone ?? "",
+        inquiryType: Variant_bookVisit_contactOwner.bookVisit,
+        message: "Interested in booking this property",
+      });
+    }
     router.navigate({ to: "/booking/$propertyId", params: { propertyId: id } });
   };
+
+  function fireContactInquiry() {
+    if (!property || !session) return;
+    createInquiry.mutate({
+      propertyId: property.id,
+      studentName: session.phone ?? "Student",
+      studentPhone: session.phone ?? "",
+      inquiryType: Variant_bookVisit_contactOwner.contactOwner,
+      message: "Student requested contact information",
+    });
+  }
 
   const availableDate = new Date(
     Number(property.availableFrom / 1_000_000n),
@@ -501,19 +520,21 @@ export default function PropertyDetailPage() {
           </div>
 
           {/* Amenities */}
-          {property.amenities.length > 0 && (
+          {property.amenities.filter((a) => a !== "unavailable").length > 0 && (
             <div className="mb-6">
               <h3 className="font-semibold text-base mb-3">Amenities</h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {property.amenities.map((a) => (
-                  <div
-                    key={a}
-                    className="flex items-center gap-2 text-sm text-muted-foreground bg-secondary/50 px-3 py-2 rounded-lg"
-                  >
-                    <Check className="w-4 h-4 text-primary shrink-0" />
-                    {a}
-                  </div>
-                ))}
+                {property.amenities
+                  .filter((a) => a !== "unavailable")
+                  .map((a) => (
+                    <div
+                      key={a}
+                      className="flex items-center gap-2 text-sm text-muted-foreground bg-secondary/50 px-3 py-2 rounded-lg"
+                    >
+                      <Check className="w-4 h-4 text-primary shrink-0" />
+                      {a}
+                    </div>
+                  ))}
               </div>
             </div>
           )}
@@ -642,11 +663,19 @@ export default function PropertyDetailPage() {
                 </p>
                 <a
                   href={`tel:${property.contactPhone}`}
-                  className="flex-1"
+                  className="block"
+                  onClick={fireContactInquiry}
                   data-ocid="property.call.button"
                 >
-                  <Button className="w-full gap-2" variant="default" size="sm">
-                    <Phone className="w-4 h-4" /> Call Owner
+                  <Button
+                    className="w-full gap-2"
+                    variant="default"
+                    size="sm"
+                    asChild
+                  >
+                    <span>
+                      <Phone className="w-4 h-4" /> Call Owner
+                    </span>
                   </Button>
                 </a>
                 {whatsappPhone && (
@@ -654,15 +683,19 @@ export default function PropertyDetailPage() {
                     href={`https://wa.me/${whatsappPhone}`}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={fireContactInquiry}
                     data-ocid="property.whatsapp.button"
                   >
                     <Button
                       className="w-full gap-2"
                       variant="outline"
                       size="sm"
+                      asChild
                     >
-                      <WhatsAppIcon className="w-4 h-4 text-green-600" />
-                      WhatsApp
+                      <span>
+                        <WhatsAppIcon className="w-4 h-4 text-green-600" />
+                        WhatsApp
+                      </span>
                     </Button>
                   </a>
                 )}

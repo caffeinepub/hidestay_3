@@ -32,7 +32,9 @@ import CreateListingPage from "./pages/owner/CreateListingPage";
 import EditListingPage from "./pages/owner/EditListingPage";
 import ListingBookingsPage from "./pages/owner/ListingBookingsPage";
 import OwnerDashboardPage from "./pages/owner/OwnerDashboardPage";
+import OwnerLeadsPage from "./pages/owner/OwnerLeadsPage";
 import OwnerListingsPage from "./pages/owner/OwnerListingsPage";
+import OwnerNotificationsPage from "./pages/owner/OwnerNotificationsPage";
 
 const rootRoute = createRootRoute({
   component: () => (
@@ -156,6 +158,18 @@ const listingBookingsRoute = createRoute({
   component: ListingBookingsPage,
 });
 
+const ownerLeadsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/owner/leads",
+  component: OwnerLeadsPage,
+});
+
+const ownerNotificationsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/owner/notifications",
+  component: OwnerNotificationsPage,
+});
+
 // Admin auth routes
 const adminLoginRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -239,6 +253,8 @@ export const routeTree = rootRoute.addChildren([
   createListingRoute,
   editListingRoute,
   listingBookingsRoute,
+  ownerLeadsRoute,
+  ownerNotificationsRoute,
   // Admin auth
   adminLoginRoute,
   adminForgotPasswordRoute,

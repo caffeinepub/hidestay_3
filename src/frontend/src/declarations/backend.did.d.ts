@@ -38,6 +38,28 @@ export interface Booking {
 }
 export interface Coordinates { 'lat' : string, 'lang' : string }
 export type ExternalBlob = Uint8Array;
+export interface Inquiry {
+  'id' : bigint,
+  'status' : { 'pending' : null } |
+    { 'rejected' : null } |
+    { 'accepted' : null },
+  'studentName' : string,
+  'inquiryType' : { 'bookVisit' : null } |
+    { 'contactOwner' : null },
+  'studentPrincipal' : Principal,
+  'studentPhone' : string,
+  'propertyId' : bigint,
+  'message' : string,
+  'timestamp' : Time,
+}
+export interface Notification {
+  'id' : bigint,
+  'ownerPrincipal' : Principal,
+  'relatedInquiryId' : [] | [bigint],
+  'isRead' : boolean,
+  'message' : string,
+  'timestamp' : Time,
+}
 export interface Property {
   'id' : bigint,
   'title' : string,
@@ -57,6 +79,13 @@ export interface Property {
   'photos' : Array<ExternalBlob>,
   'coordinates' : Coordinates,
   'contactPhone' : string,
+}
+export interface Review {
+  'propertyId' : bigint,
+  'comment' : string,
+  'timestamp' : Time,
+  'student' : Principal,
+  'rating' : bigint,
 }
 export interface ShoppingItem {
   'productName' : string,
@@ -132,6 +161,7 @@ export interface _SERVICE {
   >,
   '_caffeineStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
+  'addReview' : ActorMethod<[bigint, bigint, string], undefined>,
   'addToWishlist' : ActorMethod<[bigint], undefined>,
   'approveProperty' : ActorMethod<[bigint], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
@@ -140,14 +170,32 @@ export interface _SERVICE {
     [Array<ShoppingItem>, string, string],
     string
   >,
+  'createInquiry' : ActorMethod<
+    [
+      bigint,
+      string,
+      string,
+      { 'bookVisit' : null } |
+        { 'contactOwner' : null },
+      string,
+    ],
+    undefined
+  >,
+  'deleteProperty' : ActorMethod<[bigint], undefined>,
+  'deleteReview' : ActorMethod<[bigint, Principal], undefined>,
+  'getAllInquiries' : ActorMethod<[], Array<Inquiry>>,
   'getApprovedProperties' : ActorMethod<[], Array<Property>>,
   'getBookings' : ActorMethod<[], Array<Booking>>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
+  'getOwnerInquiries' : ActorMethod<[], Array<Inquiry>>,
+  'getOwnerNotifications' : ActorMethod<[], Array<Notification>>,
   'getProperties' : ActorMethod<[], Array<Property>>,
   'getProperty' : ActorMethod<[bigint], [] | [Property]>,
   'getPropertyBookings' : ActorMethod<[bigint], Array<Booking>>,
+  'getReviews' : ActorMethod<[bigint], Array<Review>>,
   'getStripeSessionStatus' : ActorMethod<[string], StripeSessionStatus>,
+  'getUnreadNotificationCount' : ActorMethod<[], bigint>,
   'getUserBookings' : ActorMethod<[Principal], Array<Booking>>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'getWishlist' : ActorMethod<[], Array<bigint>>,
@@ -156,12 +204,18 @@ export interface _SERVICE {
   'isStripeConfigured' : ActorMethod<[], boolean>,
   'listApprovals' : ActorMethod<[], Array<UserApprovalInfo>>,
   'listProperty' : ActorMethod<[Property], undefined>,
+  'markAllNotificationsRead' : ActorMethod<[], undefined>,
+  'markNotificationRead' : ActorMethod<[bigint], undefined>,
   'removeFromWishlist' : ActorMethod<[bigint], undefined>,
   'requestApproval' : ActorMethod<[], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'setApproval' : ActorMethod<[Principal, ApprovalStatus], undefined>,
   'setStripeConfiguration' : ActorMethod<[StripeConfiguration], undefined>,
   'transform' : ActorMethod<[TransformationInput], TransformationOutput>,
+  'updateInquiryStatus' : ActorMethod<
+    [bigint, { 'rejected' : null } | { 'accepted' : null }],
+    undefined
+  >,
   'updateProperty' : ActorMethod<[bigint, Property], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;

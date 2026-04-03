@@ -1,20 +1,26 @@
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRouter } from "@tanstack/react-router";
 import {
   AlertCircle,
+  Bell,
   Building2,
   Calendar,
   CheckCircle2,
+  Inbox,
   PlusCircle,
 } from "lucide-react";
+import { Variant_pending_rejected_accepted } from "../../backend";
 import RouteGuard from "../../components/RouteGuard";
 import { useInternetIdentity } from "../../hooks/useInternetIdentity";
 import {
   useAllBookings,
   useAllProperties,
   useIsApproved,
+  useOwnerInquiries,
+  useUnreadNotificationCount,
 } from "../../hooks/useQueries";
 
 export default function OwnerDashboardPage() {
@@ -31,6 +37,8 @@ function OwnerDashboardInner() {
   const { data: allProperties, isLoading: propsLoading } = useAllProperties();
   const { data: allBookings, isLoading: bookingsLoading } = useAllBookings();
   const { data: isApproved } = useIsApproved();
+  const { data: inquiries, isLoading: inquiriesLoading } = useOwnerInquiries();
+  const { data: unreadCount } = useUnreadNotificationCount();
 
   const principal = identity?.getPrincipal().toString();
 
@@ -44,6 +52,13 @@ function OwnerDashboardInner() {
 
   const approvedCount = myProperties.filter((p) => p.approved).length;
 
+  const pendingLeads = (inquiries ?? []).filter(
+    (i) => i.status === Variant_pending_rejected_accepted.pending,
+  ).length;
+
+  const notifCount = Number(unreadCount ?? BigInt(0));
+  const notifDisplay = notifCount > 9 ? "9+" : notifCount.toString();
+
   return (
     <div className="container max-w-6xl mx-auto px-4 py-10">
       <div className="flex items-center justify-between mb-8">
@@ -55,12 +70,35 @@ function OwnerDashboardInner() {
             Manage your properties and track bookings
           </p>
         </div>
-        <Button
-          onClick={() => router.navigate({ to: "/owner/listings/new" })}
-          data-ocid="owner.new_listing.button"
-        >
-          <PlusCircle className="w-4 h-4 mr-2" /> Add Listing
-        </Button>
+        <div className="flex items-center gap-3">
+          {/* Notification Bell */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="relative"
+            onClick={() => router.navigate({ to: "/owner/notifications" })}
+            data-ocid="owner.notifications.button"
+            aria-label={`Notifications${
+              notifCount > 0 ? ` (${notifCount} unread)` : ""
+            }`}
+          >
+            <Bell className="w-4 h-4" />
+            {notifCount > 0 && (
+              <span
+                className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center px-1"
+                data-ocid="owner.notification.count.badge"
+              >
+                {notifDisplay}
+              </span>
+            )}
+          </Button>
+          <Button
+            onClick={() => router.navigate({ to: "/owner/listings/new" })}
+            data-ocid="owner.new_listing.button"
+          >
+            <PlusCircle className="w-4 h-4 mr-2" /> Add Listing
+          </Button>
+        </div>
       </div>
 
       {/* Approval Banner */}
@@ -75,7 +113,7 @@ function OwnerDashboardInner() {
       )}
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
         <Card className="border-border shadow-xs">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -123,10 +161,32 @@ function OwnerDashboardInner() {
             )}
           </CardContent>
         </Card>
+
+        <Card className="border-border shadow-xs">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Inbox className="w-4 h-4 text-amber-500" /> New Leads
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {inquiriesLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="flex items-center gap-2">
+                <p className="text-3xl font-bold">{pendingLeads}</p>
+                {pendingLeads > 0 && (
+                  <Badge className="bg-amber-100 text-amber-700 border-amber-200 border text-xs">
+                    pending
+                  </Badge>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Quick links */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Button
           variant="outline"
           className="h-14 text-base"
@@ -142,6 +202,19 @@ function OwnerDashboardInner() {
           data-ocid="owner.create_listing.button"
         >
           <PlusCircle className="w-5 h-5 mr-2" /> Create New Listing
+        </Button>
+        <Button
+          variant="outline"
+          className="h-14 text-base relative"
+          onClick={() => router.navigate({ to: "/owner/leads" })}
+          data-ocid="owner.view_leads.button"
+        >
+          <Inbox className="w-5 h-5 mr-2" /> View Leads
+          {pendingLeads > 0 && (
+            <Badge className="ml-2 bg-amber-100 text-amber-700 border-amber-200 border text-xs">
+              {pendingLeads}
+            </Badge>
+          )}
         </Button>
       </div>
     </div>

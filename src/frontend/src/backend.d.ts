@@ -14,6 +14,13 @@ export class ExternalBlob {
     static fromBytes(blob: Uint8Array<ArrayBuffer>): ExternalBlob;
     withUploadProgress(onProgress: (percentage: number) => void): ExternalBlob;
 }
+export interface Review {
+    propertyId: bigint;
+    comment: string;
+    timestamp: Time;
+    student: Principal;
+    rating: bigint;
+}
 export interface Address {
     blocknumber: string;
     street: string;
@@ -61,13 +68,6 @@ export interface Property {
     coordinates: Coordinates;
     contactPhone: string;
 }
-export interface Review {
-    propertyId: bigint;
-    student: Principal;
-    rating: bigint;
-    comment: string;
-    timestamp: Time;
-}
 export interface ShoppingItem {
     productName: string;
     currency: string;
@@ -78,6 +78,14 @@ export interface ShoppingItem {
 export interface TransformationInput {
     context: Uint8Array;
     response: http_request_result;
+}
+export interface Notification {
+    id: bigint;
+    ownerPrincipal: Principal;
+    relatedInquiryId?: bigint;
+    isRead: boolean;
+    message: string;
+    timestamp: Time;
 }
 export interface Booking {
     id: bigint;
@@ -111,6 +119,17 @@ export interface StripeConfiguration {
     allowedCountries: Array<string>;
     secretKey: string;
 }
+export interface Inquiry {
+    id: bigint;
+    status: Variant_pending_rejected_accepted;
+    studentName: string;
+    inquiryType: Variant_bookVisit_contactOwner;
+    studentPrincipal: Principal;
+    studentPhone: string;
+    propertyId: bigint;
+    message: string;
+    timestamp: Time;
+}
 export interface UserProfile {
     name: string;
     role: Variant_admin_owner_student;
@@ -137,6 +156,10 @@ export enum Variant_apartment_sharedRoom_single {
     sharedRoom = "sharedRoom",
     single = "single"
 }
+export enum Variant_bookVisit_contactOwner {
+    bookVisit = "bookVisit",
+    contactOwner = "contactOwner"
+}
 export enum Variant_boys_unisex_girls {
     boys = "boys",
     unisex = "unisex",
@@ -148,6 +171,15 @@ export enum Variant_cancelled_pending_paid_rejected {
     paid = "paid",
     rejected = "rejected"
 }
+export enum Variant_pending_rejected_accepted {
+    pending = "pending",
+    rejected = "rejected",
+    accepted = "accepted"
+}
+export enum Variant_rejected_accepted {
+    rejected = "rejected",
+    accepted = "accepted"
+}
 export interface backendInterface {
     addReview(propertyId: bigint, rating: bigint, comment: string): Promise<void>;
     addToWishlist(propertyId: bigint): Promise<void>;
@@ -155,16 +187,22 @@ export interface backendInterface {
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     bookProperty(booking: Booking): Promise<void>;
     createCheckoutSession(items: Array<ShoppingItem>, successUrl: string, cancelUrl: string): Promise<string>;
+    createInquiry(propertyId: bigint, studentName: string, studentPhone: string, inquiryType: Variant_bookVisit_contactOwner, message: string): Promise<void>;
+    deleteProperty(propertyId: bigint): Promise<void>;
     deleteReview(propertyId: bigint, reviewer: Principal): Promise<void>;
+    getAllInquiries(): Promise<Array<Inquiry>>;
     getApprovedProperties(): Promise<Array<Property>>;
     getBookings(): Promise<Array<Booking>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
+    getOwnerInquiries(): Promise<Array<Inquiry>>;
+    getOwnerNotifications(): Promise<Array<Notification>>;
     getProperties(): Promise<Array<Property>>;
     getProperty(id: bigint): Promise<Property | null>;
     getPropertyBookings(propertyId: bigint): Promise<Array<Booking>>;
     getReviews(propertyId: bigint): Promise<Array<Review>>;
     getStripeSessionStatus(sessionId: string): Promise<StripeSessionStatus>;
+    getUnreadNotificationCount(): Promise<bigint>;
     getUserBookings(user: Principal): Promise<Array<Booking>>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     getWishlist(): Promise<Array<bigint>>;
@@ -173,11 +211,14 @@ export interface backendInterface {
     isStripeConfigured(): Promise<boolean>;
     listApprovals(): Promise<Array<UserApprovalInfo>>;
     listProperty(property: Property): Promise<void>;
+    markAllNotificationsRead(): Promise<void>;
+    markNotificationRead(notificationId: bigint): Promise<void>;
     removeFromWishlist(propertyId: bigint): Promise<void>;
     requestApproval(): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     setApproval(user: Principal, status: ApprovalStatus): Promise<void>;
     setStripeConfiguration(config: StripeConfiguration): Promise<void>;
     transform(input: TransformationInput): Promise<TransformationOutput>;
+    updateInquiryStatus(inquiryId: bigint, status: Variant_rejected_accepted): Promise<void>;
     updateProperty(propertyId: bigint, property: Property): Promise<void>;
 }

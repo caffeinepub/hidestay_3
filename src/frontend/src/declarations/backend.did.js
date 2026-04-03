@@ -53,6 +53,24 @@ export const ShoppingItem = IDL.Record({
   'priceInCents' : IDL.Nat,
   'productDescription' : IDL.Text,
 });
+export const Inquiry = IDL.Record({
+  'id' : IDL.Nat,
+  'status' : IDL.Variant({
+    'pending' : IDL.Null,
+    'rejected' : IDL.Null,
+    'accepted' : IDL.Null,
+  }),
+  'studentName' : IDL.Text,
+  'inquiryType' : IDL.Variant({
+    'bookVisit' : IDL.Null,
+    'contactOwner' : IDL.Null,
+  }),
+  'studentPrincipal' : IDL.Principal,
+  'studentPhone' : IDL.Text,
+  'propertyId' : IDL.Nat,
+  'message' : IDL.Text,
+  'timestamp' : Time,
+});
 export const Address = IDL.Record({
   'blocknumber' : IDL.Text,
   'street' : IDL.Text,
@@ -96,6 +114,21 @@ export const UserProfile = IDL.Record({
   }),
   'email' : IDL.Text,
   'phone' : IDL.Text,
+});
+export const Notification = IDL.Record({
+  'id' : IDL.Nat,
+  'ownerPrincipal' : IDL.Principal,
+  'relatedInquiryId' : IDL.Opt(IDL.Nat),
+  'isRead' : IDL.Bool,
+  'message' : IDL.Text,
+  'timestamp' : Time,
+});
+export const Review = IDL.Record({
+  'propertyId' : IDL.Nat,
+  'comment' : IDL.Text,
+  'timestamp' : Time,
+  'student' : IDL.Principal,
+  'rating' : IDL.Nat,
 });
 export const StripeSessionStatus = IDL.Variant({
   'completed' : IDL.Record({
@@ -164,6 +197,7 @@ export const idlService = IDL.Service({
     ),
   '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+  'addReview' : IDL.Func([IDL.Nat, IDL.Nat, IDL.Text], [], []),
   'addToWishlist' : IDL.Func([IDL.Nat], [], []),
   'approveProperty' : IDL.Func([IDL.Nat], [], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
@@ -173,14 +207,32 @@ export const idlService = IDL.Service({
       [IDL.Text],
       [],
     ),
+  'createInquiry' : IDL.Func(
+      [
+        IDL.Nat,
+        IDL.Text,
+        IDL.Text,
+        IDL.Variant({ 'bookVisit' : IDL.Null, 'contactOwner' : IDL.Null }),
+        IDL.Text,
+      ],
+      [],
+      [],
+    ),
+  'deleteProperty' : IDL.Func([IDL.Nat], [], []),
+  'deleteReview' : IDL.Func([IDL.Nat, IDL.Principal], [], []),
+  'getAllInquiries' : IDL.Func([], [IDL.Vec(Inquiry)], ['query']),
   'getApprovedProperties' : IDL.Func([], [IDL.Vec(Property)], ['query']),
   'getBookings' : IDL.Func([], [IDL.Vec(Booking)], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+  'getOwnerInquiries' : IDL.Func([], [IDL.Vec(Inquiry)], ['query']),
+  'getOwnerNotifications' : IDL.Func([], [IDL.Vec(Notification)], ['query']),
   'getProperties' : IDL.Func([], [IDL.Vec(Property)], ['query']),
   'getProperty' : IDL.Func([IDL.Nat], [IDL.Opt(Property)], ['query']),
   'getPropertyBookings' : IDL.Func([IDL.Nat], [IDL.Vec(Booking)], ['query']),
+  'getReviews' : IDL.Func([IDL.Nat], [IDL.Vec(Review)], ['query']),
   'getStripeSessionStatus' : IDL.Func([IDL.Text], [StripeSessionStatus], []),
+  'getUnreadNotificationCount' : IDL.Func([], [IDL.Nat], ['query']),
   'getUserBookings' : IDL.Func([IDL.Principal], [IDL.Vec(Booking)], ['query']),
   'getUserProfile' : IDL.Func(
       [IDL.Principal],
@@ -193,6 +245,8 @@ export const idlService = IDL.Service({
   'isStripeConfigured' : IDL.Func([], [IDL.Bool], ['query']),
   'listApprovals' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
   'listProperty' : IDL.Func([Property], [], []),
+  'markAllNotificationsRead' : IDL.Func([], [], []),
+  'markNotificationRead' : IDL.Func([IDL.Nat], [], []),
   'removeFromWishlist' : IDL.Func([IDL.Nat], [], []),
   'requestApproval' : IDL.Func([], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
@@ -202,6 +256,11 @@ export const idlService = IDL.Service({
       [TransformationInput],
       [TransformationOutput],
       ['query'],
+    ),
+  'updateInquiryStatus' : IDL.Func(
+      [IDL.Nat, IDL.Variant({ 'rejected' : IDL.Null, 'accepted' : IDL.Null })],
+      [],
+      [],
     ),
   'updateProperty' : IDL.Func([IDL.Nat, Property], [], []),
 });
@@ -254,6 +313,24 @@ export const idlFactory = ({ IDL }) => {
     'priceInCents' : IDL.Nat,
     'productDescription' : IDL.Text,
   });
+  const Inquiry = IDL.Record({
+    'id' : IDL.Nat,
+    'status' : IDL.Variant({
+      'pending' : IDL.Null,
+      'rejected' : IDL.Null,
+      'accepted' : IDL.Null,
+    }),
+    'studentName' : IDL.Text,
+    'inquiryType' : IDL.Variant({
+      'bookVisit' : IDL.Null,
+      'contactOwner' : IDL.Null,
+    }),
+    'studentPrincipal' : IDL.Principal,
+    'studentPhone' : IDL.Text,
+    'propertyId' : IDL.Nat,
+    'message' : IDL.Text,
+    'timestamp' : Time,
+  });
   const Address = IDL.Record({
     'blocknumber' : IDL.Text,
     'street' : IDL.Text,
@@ -297,6 +374,21 @@ export const idlFactory = ({ IDL }) => {
     }),
     'email' : IDL.Text,
     'phone' : IDL.Text,
+  });
+  const Notification = IDL.Record({
+    'id' : IDL.Nat,
+    'ownerPrincipal' : IDL.Principal,
+    'relatedInquiryId' : IDL.Opt(IDL.Nat),
+    'isRead' : IDL.Bool,
+    'message' : IDL.Text,
+    'timestamp' : Time,
+  });
+  const Review = IDL.Record({
+    'propertyId' : IDL.Nat,
+    'comment' : IDL.Text,
+    'timestamp' : Time,
+    'student' : IDL.Principal,
+    'rating' : IDL.Nat,
   });
   const StripeSessionStatus = IDL.Variant({
     'completed' : IDL.Record({
@@ -362,6 +454,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+    'addReview' : IDL.Func([IDL.Nat, IDL.Nat, IDL.Text], [], []),
     'addToWishlist' : IDL.Func([IDL.Nat], [], []),
     'approveProperty' : IDL.Func([IDL.Nat], [], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
@@ -371,14 +464,32 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Text],
         [],
       ),
+    'createInquiry' : IDL.Func(
+        [
+          IDL.Nat,
+          IDL.Text,
+          IDL.Text,
+          IDL.Variant({ 'bookVisit' : IDL.Null, 'contactOwner' : IDL.Null }),
+          IDL.Text,
+        ],
+        [],
+        [],
+      ),
+    'deleteProperty' : IDL.Func([IDL.Nat], [], []),
+    'deleteReview' : IDL.Func([IDL.Nat, IDL.Principal], [], []),
+    'getAllInquiries' : IDL.Func([], [IDL.Vec(Inquiry)], ['query']),
     'getApprovedProperties' : IDL.Func([], [IDL.Vec(Property)], ['query']),
     'getBookings' : IDL.Func([], [IDL.Vec(Booking)], ['query']),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+    'getOwnerInquiries' : IDL.Func([], [IDL.Vec(Inquiry)], ['query']),
+    'getOwnerNotifications' : IDL.Func([], [IDL.Vec(Notification)], ['query']),
     'getProperties' : IDL.Func([], [IDL.Vec(Property)], ['query']),
     'getProperty' : IDL.Func([IDL.Nat], [IDL.Opt(Property)], ['query']),
     'getPropertyBookings' : IDL.Func([IDL.Nat], [IDL.Vec(Booking)], ['query']),
+    'getReviews' : IDL.Func([IDL.Nat], [IDL.Vec(Review)], ['query']),
     'getStripeSessionStatus' : IDL.Func([IDL.Text], [StripeSessionStatus], []),
+    'getUnreadNotificationCount' : IDL.Func([], [IDL.Nat], ['query']),
     'getUserBookings' : IDL.Func(
         [IDL.Principal],
         [IDL.Vec(Booking)],
@@ -395,6 +506,8 @@ export const idlFactory = ({ IDL }) => {
     'isStripeConfigured' : IDL.Func([], [IDL.Bool], ['query']),
     'listApprovals' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
     'listProperty' : IDL.Func([Property], [], []),
+    'markAllNotificationsRead' : IDL.Func([], [], []),
+    'markNotificationRead' : IDL.Func([IDL.Nat], [], []),
     'removeFromWishlist' : IDL.Func([IDL.Nat], [], []),
     'requestApproval' : IDL.Func([], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
@@ -404,6 +517,14 @@ export const idlFactory = ({ IDL }) => {
         [TransformationInput],
         [TransformationOutput],
         ['query'],
+      ),
+    'updateInquiryStatus' : IDL.Func(
+        [
+          IDL.Nat,
+          IDL.Variant({ 'rejected' : IDL.Null, 'accepted' : IDL.Null }),
+        ],
+        [],
+        [],
       ),
     'updateProperty' : IDL.Func([IDL.Nat, Property], [], []),
   });

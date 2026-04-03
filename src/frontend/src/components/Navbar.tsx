@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Link, useRouter } from "@tanstack/react-router";
 import {
+  Bell,
   Building2,
   ChevronDown,
   Heart,
@@ -19,6 +20,31 @@ import {
   User,
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
+import { useUnreadNotificationCount } from "../hooks/useQueries";
+
+function NotificationBell() {
+  const router = useRouter();
+  const { data: unreadCount } = useUnreadNotificationCount();
+  const count = Number(unreadCount ?? BigInt(0));
+  const display = count > 9 ? "9+" : count.toString();
+
+  return (
+    <button
+      type="button"
+      className="relative p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+      onClick={() => router.navigate({ to: "/owner/notifications" })}
+      aria-label={`Notifications${count > 0 ? ` (${count} unread)` : ""}`}
+      data-ocid="nav.owner.notifications.button"
+    >
+      <Bell className="w-5 h-5" />
+      {count > 0 && (
+        <span className="absolute top-0.5 right-0.5 min-w-[16px] h-[16px] rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold flex items-center justify-center px-0.5">
+          {display}
+        </span>
+      )}
+    </button>
+  );
+}
 
 export default function Navbar() {
   const { session, adminSession, logout, adminLogout, currentRole } = useAuth();
@@ -109,6 +135,7 @@ export default function Navbar() {
                 >
                   My Listings
                 </Link>
+                <NotificationBell />
               </>
             )}
             {isLoggedIn && isAdmin && (
@@ -218,15 +245,26 @@ export default function Navbar() {
                     </DropdownMenuItem>
                   )}
                   {isOwner && (
-                    <DropdownMenuItem
-                      onClick={() =>
-                        router.navigate({ to: "/owner/dashboard" })
-                      }
-                      data-ocid="nav.owner.menu.item"
-                    >
-                      <Building2 className="w-4 h-4 mr-2" />
-                      Owner Dashboard
-                    </DropdownMenuItem>
+                    <>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          router.navigate({ to: "/owner/dashboard" })
+                        }
+                        data-ocid="nav.owner.menu.item"
+                      >
+                        <Building2 className="w-4 h-4 mr-2" />
+                        Owner Dashboard
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          router.navigate({ to: "/owner/notifications" })
+                        }
+                        data-ocid="nav.owner.notifications.menu.item"
+                      >
+                        <Bell className="w-4 h-4 mr-2" />
+                        Notifications
+                      </DropdownMenuItem>
+                    </>
                   )}
                   {isAdmin && (
                     <>
