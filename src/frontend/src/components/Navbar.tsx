@@ -12,6 +12,7 @@ import { Link, useRouter } from "@tanstack/react-router";
 import {
   Building2,
   ChevronDown,
+  Heart,
   Home,
   LogOut,
   Shield,
@@ -75,13 +76,22 @@ export default function Navbar() {
               Browse Properties
             </Link>
             {isLoggedIn && isStudent && (
-              <Link
-                to="/my-bookings"
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-                data-ocid="nav.bookings.link"
-              >
-                My Bookings
-              </Link>
+              <>
+                <Link
+                  to="/my-bookings"
+                  className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  data-ocid="nav.bookings.link"
+                >
+                  My Bookings
+                </Link>
+                <Link
+                  to="/wishlist"
+                  className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                  data-ocid="nav.wishlist.link"
+                >
+                  <Heart className="w-4 h-4" /> Wishlist
+                </Link>
+              </>
             )}
             {isLoggedIn && isOwner && (
               <>
@@ -196,6 +206,15 @@ export default function Navbar() {
                     >
                       <User className="w-4 h-4 mr-2" />
                       Profile Settings
+                    </DropdownMenuItem>
+                  )}
+                  {isStudent && (
+                    <DropdownMenuItem
+                      onClick={() => router.navigate({ to: "/wishlist" })}
+                      data-ocid="nav.wishlist.menu.item"
+                    >
+                      <Heart className="w-4 h-4 mr-2" />
+                      My Wishlist
                     </DropdownMenuItem>
                   )}
                   {isOwner && (

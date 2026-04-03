@@ -13,6 +13,7 @@ import PaymentCancelPage from "./pages/PaymentCancelPage";
 import PaymentSuccessPage from "./pages/PaymentSuccessPage";
 import PropertyDetailPage from "./pages/PropertyDetailPage";
 import SearchPage from "./pages/SearchPage";
+import WishlistPage from "./pages/WishlistPage";
 import AdminBookingsPage from "./pages/admin/AdminBookingsPage";
 import AdminCreatePage from "./pages/admin/AdminCreatePage";
 import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
@@ -20,6 +21,7 @@ import AdminForgotPasswordPage from "./pages/admin/AdminForgotPasswordPage";
 import AdminListingsPage from "./pages/admin/AdminListingsPage";
 import AdminLoginPage from "./pages/admin/AdminLoginPage";
 import AdminResetPasswordPage from "./pages/admin/AdminResetPasswordPage";
+import AdminReviewsPage from "./pages/admin/AdminReviewsPage";
 import AdminStripePage from "./pages/admin/AdminStripePage";
 import AdminUsersPage from "./pages/admin/AdminUsersPage";
 import OTPVerifyPage from "./pages/auth/OTPVerifyPage";
@@ -72,6 +74,12 @@ const myBookingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/my-bookings",
   component: MyBookingsPage,
+});
+
+const wishlistRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/wishlist",
+  component: WishlistPage,
 });
 
 // Auth routes
@@ -204,12 +212,19 @@ const adminStripeRoute = createRoute({
   component: AdminStripePage,
 });
 
+const adminReviewsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin/reviews",
+  component: AdminReviewsPage,
+});
+
 export const routeTree = rootRoute.addChildren([
   indexRoute,
   searchRoute,
   propertyRoute,
   bookingRoute,
   myBookingsRoute,
+  wishlistRoute,
   // Auth
   authRoleRoute,
   authPhoneRoute,
@@ -235,6 +250,7 @@ export const routeTree = rootRoute.addChildren([
   adminUsersRoute,
   adminBookingsRoute,
   adminStripeRoute,
+  adminReviewsRoute,
 ]);
 
 declare module "@tanstack/react-router" {

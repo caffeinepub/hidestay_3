@@ -7,6 +7,7 @@ import {
   Building2,
   CreditCard,
   GraduationCap,
+  MapPin,
   Search,
   Shield,
   Star,
@@ -55,6 +56,7 @@ export default function LandingPage() {
   const { data: properties, isLoading } = useApprovedProperties();
 
   const featuredProperties = (properties ?? []).slice(0, 6);
+  const nearbyProperties = (properties ?? []).slice(-6);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,7 +106,7 @@ export default function LandingPage() {
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search by city or college name..."
+                    placeholder="Search by location or college"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-9 h-11 bg-card border-input"
@@ -282,6 +284,62 @@ export default function LandingPage() {
                   featured={i < 2}
                   index={i}
                 />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Nearby Properties */}
+      <section className="py-16" data-ocid="nearby.section">
+        <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="font-display font-bold text-3xl text-foreground mb-2">
+                Nearby Properties
+              </h2>
+              <p className="text-muted-foreground flex items-center gap-1">
+                <MapPin className="w-4 h-4" /> Explore stays in popular areas
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => router.navigate({ to: "/search" })}
+              data-ocid="nearby.view_all.button"
+            >
+              View All <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
+
+          {isLoading ? (
+            <div className="flex gap-4 overflow-x-auto pb-4">
+              {[1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className="min-w-[280px] bg-card border border-border rounded-xl h-72 animate-pulse flex-shrink-0"
+                  data-ocid="nearby.loading_state"
+                />
+              ))}
+            </div>
+          ) : nearbyProperties.length === 0 ? (
+            <div
+              className="text-center py-12 bg-card border border-border rounded-xl"
+              data-ocid="nearby.empty_state"
+            >
+              <MapPin className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+              <p className="text-muted-foreground">
+                No nearby properties available yet.
+              </p>
+            </div>
+          ) : (
+            <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 sm:mx-0 sm:px-0">
+              {nearbyProperties.map((p, i) => (
+                <div
+                  key={p.id.toString()}
+                  className="min-w-[280px] max-w-[320px] flex-shrink-0"
+                >
+                  <PropertyCard property={p} index={i} />
+                </div>
               ))}
             </div>
           )}

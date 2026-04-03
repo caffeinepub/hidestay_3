@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import {
   ExternalBlob,
   Variant_apartment_sharedRoom_single,
+  Variant_boys_unisex_girls,
 } from "../../backend";
 import type { Property } from "../../backend";
 import RouteGuard from "../../components/RouteGuard";
@@ -42,6 +43,9 @@ function CreateListingInner() {
   const [roomType, setRoomType] = useState<Variant_apartment_sharedRoom_single>(
     Variant_apartment_sharedRoom_single.single,
   );
+  const [genderPreference, setGenderPreference] =
+    useState<Variant_boys_unisex_girls>(Variant_boys_unisex_girls.unisex);
+  const [contactPhone, setContactPhone] = useState("");
   const [amenityInput, setAmenityInput] = useState("");
   const [amenities, setAmenities] = useState<string[]>([]);
   const [availableFrom, setAvailableFrom] = useState("");
@@ -104,6 +108,8 @@ function CreateListingInner() {
           ? BigInt(new Date(availableFrom).getTime()) * 1_000_000n
           : BigInt(Date.now()) * 1_000_000n,
         approved: false,
+        genderPreference: genderPreference as Variant_boys_unisex_girls,
+        contactPhone,
         address: {
           street,
           city,
@@ -209,7 +215,7 @@ function CreateListingInner() {
                   <SelectItem
                     value={Variant_apartment_sharedRoom_single.single}
                   >
-                    Single Room
+                    Private Room
                   </SelectItem>
                   <SelectItem
                     value={Variant_apartment_sharedRoom_single.sharedRoom}
@@ -219,7 +225,46 @@ function CreateListingInner() {
                   <SelectItem
                     value={Variant_apartment_sharedRoom_single.apartment}
                   >
-                    Apartment
+                    PG / Flat
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="contact-phone">Contact Phone Number *</Label>
+              <Input
+                id="contact-phone"
+                type="tel"
+                value={contactPhone}
+                onChange={(e) => setContactPhone(e.target.value)}
+                placeholder="+91 9876543210"
+                required
+                data-ocid="create_listing.contact_phone.input"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Gender Preference *</Label>
+              <Select
+                value={genderPreference}
+                onValueChange={(v) =>
+                  setGenderPreference(v as Variant_boys_unisex_girls)
+                }
+              >
+                <SelectTrigger data-ocid="create_listing.gender.select">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={Variant_boys_unisex_girls.unisex}>
+                    Unisex
+                  </SelectItem>
+                  <SelectItem value={Variant_boys_unisex_girls.boys}>
+                    Boys Only
+                  </SelectItem>
+                  <SelectItem value={Variant_boys_unisex_girls.girls}>
+                    Girls Only
                   </SelectItem>
                 </SelectContent>
               </Select>

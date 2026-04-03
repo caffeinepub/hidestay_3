@@ -53,11 +53,20 @@ export interface Property {
     amenities: Array<string>;
     availableFrom: Time;
     approved: boolean;
+    genderPreference: Variant_boys_unisex_girls;
     address: Address;
     pricePerMonth: bigint;
     roomType: Variant_apartment_sharedRoom_single;
     photos: Array<ExternalBlob>;
     coordinates: Coordinates;
+    contactPhone: string;
+}
+export interface Review {
+    propertyId: bigint;
+    student: Principal;
+    rating: bigint;
+    comment: string;
+    timestamp: Time;
 }
 export interface ShoppingItem {
     productName: string;
@@ -128,6 +137,11 @@ export enum Variant_apartment_sharedRoom_single {
     sharedRoom = "sharedRoom",
     single = "single"
 }
+export enum Variant_boys_unisex_girls {
+    boys = "boys",
+    unisex = "unisex",
+    girls = "girls"
+}
 export enum Variant_cancelled_pending_paid_rejected {
     cancelled = "cancelled",
     pending = "pending",
@@ -135,10 +149,13 @@ export enum Variant_cancelled_pending_paid_rejected {
     rejected = "rejected"
 }
 export interface backendInterface {
+    addReview(propertyId: bigint, rating: bigint, comment: string): Promise<void>;
+    addToWishlist(propertyId: bigint): Promise<void>;
     approveProperty(propertyId: bigint): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     bookProperty(booking: Booking): Promise<void>;
     createCheckoutSession(items: Array<ShoppingItem>, successUrl: string, cancelUrl: string): Promise<string>;
+    deleteReview(propertyId: bigint, reviewer: Principal): Promise<void>;
     getApprovedProperties(): Promise<Array<Property>>;
     getBookings(): Promise<Array<Booking>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
@@ -146,14 +163,17 @@ export interface backendInterface {
     getProperties(): Promise<Array<Property>>;
     getProperty(id: bigint): Promise<Property | null>;
     getPropertyBookings(propertyId: bigint): Promise<Array<Booking>>;
+    getReviews(propertyId: bigint): Promise<Array<Review>>;
     getStripeSessionStatus(sessionId: string): Promise<StripeSessionStatus>;
     getUserBookings(user: Principal): Promise<Array<Booking>>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
+    getWishlist(): Promise<Array<bigint>>;
     isCallerAdmin(): Promise<boolean>;
     isCallerApproved(): Promise<boolean>;
     isStripeConfigured(): Promise<boolean>;
     listApprovals(): Promise<Array<UserApprovalInfo>>;
     listProperty(property: Property): Promise<void>;
+    removeFromWishlist(propertyId: bigint): Promise<void>;
     requestApproval(): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     setApproval(user: Principal, status: ApprovalStatus): Promise<void>;

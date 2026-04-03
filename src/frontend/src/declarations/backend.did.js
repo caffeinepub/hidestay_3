@@ -71,6 +71,11 @@ export const Property = IDL.Record({
   'amenities' : IDL.Vec(IDL.Text),
   'availableFrom' : Time,
   'approved' : IDL.Bool,
+  'genderPreference' : IDL.Variant({
+    'boys' : IDL.Null,
+    'unisex' : IDL.Null,
+    'girls' : IDL.Null,
+  }),
   'address' : Address,
   'pricePerMonth' : IDL.Nat,
   'roomType' : IDL.Variant({
@@ -80,6 +85,7 @@ export const Property = IDL.Record({
   }),
   'photos' : IDL.Vec(ExternalBlob),
   'coordinates' : Coordinates,
+  'contactPhone' : IDL.Text,
 });
 export const UserProfile = IDL.Record({
   'name' : IDL.Text,
@@ -158,6 +164,7 @@ export const idlService = IDL.Service({
     ),
   '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+  'addToWishlist' : IDL.Func([IDL.Nat], [], []),
   'approveProperty' : IDL.Func([IDL.Nat], [], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'bookProperty' : IDL.Func([Booking], [], []),
@@ -180,11 +187,13 @@ export const idlService = IDL.Service({
       [IDL.Opt(UserProfile)],
       ['query'],
     ),
+  'getWishlist' : IDL.Func([], [IDL.Vec(IDL.Nat)], ['query']),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'isCallerApproved' : IDL.Func([], [IDL.Bool], ['query']),
   'isStripeConfigured' : IDL.Func([], [IDL.Bool], ['query']),
   'listApprovals' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
   'listProperty' : IDL.Func([Property], [], []),
+  'removeFromWishlist' : IDL.Func([IDL.Nat], [], []),
   'requestApproval' : IDL.Func([], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'setApproval' : IDL.Func([IDL.Principal, ApprovalStatus], [], []),
@@ -263,6 +272,11 @@ export const idlFactory = ({ IDL }) => {
     'amenities' : IDL.Vec(IDL.Text),
     'availableFrom' : Time,
     'approved' : IDL.Bool,
+    'genderPreference' : IDL.Variant({
+      'boys' : IDL.Null,
+      'unisex' : IDL.Null,
+      'girls' : IDL.Null,
+    }),
     'address' : Address,
     'pricePerMonth' : IDL.Nat,
     'roomType' : IDL.Variant({
@@ -272,6 +286,7 @@ export const idlFactory = ({ IDL }) => {
     }),
     'photos' : IDL.Vec(ExternalBlob),
     'coordinates' : Coordinates,
+    'contactPhone' : IDL.Text,
   });
   const UserProfile = IDL.Record({
     'name' : IDL.Text,
@@ -347,6 +362,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+    'addToWishlist' : IDL.Func([IDL.Nat], [], []),
     'approveProperty' : IDL.Func([IDL.Nat], [], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'bookProperty' : IDL.Func([Booking], [], []),
@@ -373,11 +389,13 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(UserProfile)],
         ['query'],
       ),
+    'getWishlist' : IDL.Func([], [IDL.Vec(IDL.Nat)], ['query']),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'isCallerApproved' : IDL.Func([], [IDL.Bool], ['query']),
     'isStripeConfigured' : IDL.Func([], [IDL.Bool], ['query']),
     'listApprovals' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
     'listProperty' : IDL.Func([Property], [], []),
+    'removeFromWishlist' : IDL.Func([IDL.Nat], [], []),
     'requestApproval' : IDL.Func([], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'setApproval' : IDL.Func([IDL.Principal, ApprovalStatus], [], []),

@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import {
   ExternalBlob,
   Variant_apartment_sharedRoom_single,
+  Variant_boys_unisex_girls,
 } from "../../backend";
 import RouteGuard from "../../components/RouteGuard";
 import { useProperty, useUpdateProperty } from "../../hooks/useQueries";
@@ -41,6 +42,9 @@ function EditListingInner() {
   const [roomType, setRoomType] = useState<Variant_apartment_sharedRoom_single>(
     Variant_apartment_sharedRoom_single.single,
   );
+  const [genderPreference, setGenderPreference] =
+    useState<Variant_boys_unisex_girls>(Variant_boys_unisex_girls.unisex);
+  const [contactPhone, setContactPhone] = useState("");
   const [amenities, setAmenities] = useState<string[]>([]);
   const [amenityInput, setAmenityInput] = useState("");
   const [availableFrom, setAvailableFrom] = useState("");
@@ -59,6 +63,10 @@ function EditListingInner() {
       setDescription(property.description);
       setPricePerMonth(property.pricePerMonth.toString());
       setRoomType(property.roomType);
+      setGenderPreference(
+        property.genderPreference ?? Variant_boys_unisex_girls.unisex,
+      );
+      setContactPhone(property.contactPhone ?? "");
       setAmenities(property.amenities);
       const date = new Date(Number(property.availableFrom / 1_000_000n));
       setAvailableFrom(date.toISOString().split("T")[0]);
@@ -109,6 +117,8 @@ function EditListingInner() {
           description,
           pricePerMonth: BigInt(Math.round(Number(pricePerMonth))),
           roomType,
+          genderPreference,
+          contactPhone,
           amenities,
           availableFrom: availableFrom
             ? BigInt(new Date(availableFrom).getTime()) * 1_000_000n
@@ -199,7 +209,7 @@ function EditListingInner() {
                   <SelectItem
                     value={Variant_apartment_sharedRoom_single.single}
                   >
-                    Single Room
+                    Private Room
                   </SelectItem>
                   <SelectItem
                     value={Variant_apartment_sharedRoom_single.sharedRoom}
@@ -209,12 +219,52 @@ function EditListingInner() {
                   <SelectItem
                     value={Variant_apartment_sharedRoom_single.apartment}
                   >
-                    Apartment
+                    PG / Flat
                   </SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-contact-phone">Contact Phone Number *</Label>
+              <Input
+                id="edit-contact-phone"
+                type="tel"
+                value={contactPhone}
+                onChange={(e) => setContactPhone(e.target.value)}
+                placeholder="+91 9876543210"
+                required
+                data-ocid="edit_listing.contact_phone.input"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Gender Preference *</Label>
+              <Select
+                value={genderPreference}
+                onValueChange={(v) =>
+                  setGenderPreference(v as Variant_boys_unisex_girls)
+                }
+              >
+                <SelectTrigger data-ocid="edit_listing.gender.select">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={Variant_boys_unisex_girls.unisex}>
+                    Unisex
+                  </SelectItem>
+                  <SelectItem value={Variant_boys_unisex_girls.boys}>
+                    Boys Only
+                  </SelectItem>
+                  <SelectItem value={Variant_boys_unisex_girls.girls}>
+                    Girls Only
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label>Available From</Label>
             <Input

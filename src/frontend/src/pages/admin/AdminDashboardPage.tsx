@@ -7,6 +7,7 @@ import {
   Calendar,
   Check,
   Clock,
+  MessageSquare,
   Settings,
   Users,
 } from "lucide-react";
@@ -118,7 +119,7 @@ function AdminDashboardInner() {
       </div>
 
       {/* Quick Links */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <Button
           variant="outline"
           className="h-14 text-sm"
@@ -142,6 +143,14 @@ function AdminDashboardInner() {
           data-ocid="admin.bookings.button"
         >
           <Calendar className="w-4 h-4 mr-2" /> View Bookings
+        </Button>
+        <Button
+          variant="outline"
+          className="h-14 text-sm"
+          onClick={() => router.navigate({ to: "/admin/reviews" })}
+          data-ocid="admin.reviews.button"
+        >
+          <MessageSquare className="w-4 h-4 mr-2" /> Reviews
         </Button>
         <Button
           variant="outline"

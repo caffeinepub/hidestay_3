@@ -12,6 +12,15 @@ import { type ApprovalStatus, Variant_admin_owner_student } from "../backend";
 import { useActor } from "./useActor";
 import { useInternetIdentity } from "./useInternetIdentity";
 
+// Review type (defined locally as it may not be exported from backend.ts)
+export interface Review {
+  propertyId: bigint;
+  student: Principal;
+  rating: bigint;
+  comment: string;
+  timestamp: bigint;
+}
+
 // === Auth / Profile ===
 export function useCallerProfile() {
   const { actor, isFetching } = useActor();
@@ -304,6 +313,68 @@ export function useStripeSessionStatus(sessionId: string | null) {
       if (data.__kind__ === "completed" || data.__kind__ === "failed")
         return false;
       return 3000;
+    },
+  });
+}
+
+// === Reviews ===
+export function usePropertyReviews(propertyId: bigint | undefined) {
+  const { actor, isFetching } = useActor();
+  return useQuery<Review[]>({
+    queryKey: ["reviews", propertyId?.toString()],
+    queryFn: async () => {
+      if (!actor || propertyId === undefined) return [];
+      const a = actor as any;
+      return (await a.getReviews(propertyId)) as Review[];
+    },
+    enabled: !!actor && !isFetching && propertyId !== undefined,
+  });
+}
+
+export function useAddReview() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      propertyId,
+      rating,
+      comment,
+    }: {
+      propertyId: bigint;
+      rating: bigint;
+      comment: string;
+    }) => {
+      if (!actor) throw new Error("Not connected");
+      const a = actor as any;
+      await a.addReview(propertyId, rating, comment);
+    },
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({
+        queryKey: ["reviews", variables.propertyId.toString()],
+      });
+    },
+  });
+}
+
+export function useDeleteReview() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      propertyId,
+      reviewer,
+    }: {
+      propertyId: bigint;
+      reviewer: Principal;
+    }) => {
+      if (!actor) throw new Error("Not connected");
+      const a = actor as any;
+      await a.deleteReview(propertyId, reviewer);
+    },
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({
+        queryKey: ["reviews", variables.propertyId.toString()],
+      });
     },
   });
 }

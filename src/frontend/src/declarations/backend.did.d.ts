@@ -46,6 +46,9 @@ export interface Property {
   'amenities' : Array<string>,
   'availableFrom' : Time,
   'approved' : boolean,
+  'genderPreference' : { 'boys' : null } |
+    { 'unisex' : null } |
+    { 'girls' : null },
   'address' : Address,
   'pricePerMonth' : bigint,
   'roomType' : { 'apartment' : null } |
@@ -53,6 +56,7 @@ export interface Property {
     { 'single' : null },
   'photos' : Array<ExternalBlob>,
   'coordinates' : Coordinates,
+  'contactPhone' : string,
 }
 export interface ShoppingItem {
   'productName' : string,
@@ -128,6 +132,7 @@ export interface _SERVICE {
   >,
   '_caffeineStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
+  'addToWishlist' : ActorMethod<[bigint], undefined>,
   'approveProperty' : ActorMethod<[bigint], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'bookProperty' : ActorMethod<[Booking], undefined>,
@@ -145,11 +150,13 @@ export interface _SERVICE {
   'getStripeSessionStatus' : ActorMethod<[string], StripeSessionStatus>,
   'getUserBookings' : ActorMethod<[Principal], Array<Booking>>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
+  'getWishlist' : ActorMethod<[], Array<bigint>>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'isCallerApproved' : ActorMethod<[], boolean>,
   'isStripeConfigured' : ActorMethod<[], boolean>,
   'listApprovals' : ActorMethod<[], Array<UserApprovalInfo>>,
   'listProperty' : ActorMethod<[Property], undefined>,
+  'removeFromWishlist' : ActorMethod<[bigint], undefined>,
   'requestApproval' : ActorMethod<[], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'setApproval' : ActorMethod<[Principal, ApprovalStatus], undefined>,
