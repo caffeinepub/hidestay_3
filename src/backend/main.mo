@@ -1075,4 +1075,123 @@ actor {
       transform,
     );
   };
+
+  // Confirm a paid booking after Stripe payment completes
+  public shared ({ caller }) func confirmStripeBooking(bookingId : Nat, sessionId : Text) : async () {
+    checkBlocked(caller);
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can confirm bookings");
+    };
+
+    let booking = switch (bookingList.get(bookingId)) {
+      case (null) { Runtime.trap("Booking not found") };
+      case (?b) { b };
+    };
+
+    // Only the student who made the booking can confirm
+    if (booking.student != caller and not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Can only confirm your own bookings");
+    };
+
+    // Only pending bookings can be confirmed this way
+    if (booking.status != #pending) {
+      return; // idempotent - already confirmed or cancelled
+    };
+
+    let updated : Booking = { booking with status = #paid; stripeSessionId = ?sessionId };
+    bookingList.add(bookingId, updated);
+
+    // Notify property owner
+    let property = switch (propertyList.get(booking.propertyId)) {
+      case (null) { return };
+      case (?p) { p };
+    };
+
+    let notif : Notification = {
+      id = nextNotificationId;
+      ownerPrincipal = property.owner;
+      message = "Payment received! Booking confirmed for your property: " # property.title;
+      timestamp = Time.now();
+      isRead = false;
+      relatedInquiryId = null;
+    };
+    notificationsList.add(nextNotificationId, notif);
+    nextNotificationId += 1;
+  };
+
+  // Cancel a paid booking and issue Stripe refund
+  public shared ({ caller }) func cancelPaidBooking(bookingId : Nat) : async () {
+    checkBlocked(caller);
+    let booking = switch (bookingList.get(bookingId)) {
+      case (null) { Runtime.trap("Booking not found") };
+      case (?b) { b };
+    };
+    if (booking.student != caller and not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Can only cancel your own bookings");
+    };
+    if (booking.status != #paid) {
+      Runtime.trap("Only paid bookings can be refunded via this method");
+    };
+
+    // Get the Stripe session to find the payment_intent
+    let sessionId = switch (booking.stripeSessionId) {
+      case (null) { Runtime.trap("No Stripe session ID found for this booking") };
+      case (?sid) { sid };
+    };
+
+    let config = getStripeConfiguration();
+
+    // Fetch session to get payment_intent
+    let sessionResp = await OutCall.httpGetRequest(
+      "https://api.stripe.com/v1/checkout/sessions/" # sessionId,
+      [{ name = "Authorization"; value = "Bearer " # config.secretKey }],
+      transform,
+    );
+
+    // Extract payment_intent from session response
+    let paymentIntentId : Text = extractJsonField(sessionResp, "payment_intent");
+
+    if (paymentIntentId.size() > 0) {
+      // Issue refund
+      let _refundResp = await OutCall.httpPostRequest(
+        "https://api.stripe.com/v1/refunds",
+        [{ name = "Authorization"; value = "Bearer " # config.secretKey }],
+        "payment_intent=" # paymentIntentId,
+        transform,
+      );
+    };
+
+    // Mark booking as cancelled regardless of refund result
+    let updated : Booking = { booking with status = #cancelled };
+    bookingList.add(bookingId, updated);
+  };
+
+  // Helper to extract a string field value from simple JSON response
+  func extractJsonField(json : Text, field : Text) : Text {
+    let patterns = ["\"" # field # "\":\"", "\"" # field # "\": \""];
+    for (pattern in patterns.values()) {
+      if (json.contains(#text pattern)) {
+        let parts = json.split(#text pattern);
+        switch (parts.next()) {
+          case (null) {};
+          case (?_) {
+            switch (parts.next()) {
+              case (?afterPattern) {
+                switch (afterPattern.split(#text "\"").next()) {
+                  case (?value) {
+                    if (value.size() > 0) {
+                      return value;
+                    };
+                  };
+                  case (_) {};
+                };
+              };
+              case (null) {};
+            };
+          };
+        };
+      };
+    };
+    "";
+  };
 };

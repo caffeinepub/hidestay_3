@@ -248,6 +248,43 @@ export function useCancelBooking() {
   });
 }
 
+export function useConfirmStripeBooking() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      bookingId,
+      sessionId,
+    }: {
+      bookingId: bigint;
+      sessionId: string;
+    }) => {
+      if (!actor) throw new Error("Not connected");
+      await (actor as any).confirmStripeBooking(bookingId, sessionId);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["myBookings"] });
+      qc.invalidateQueries({ queryKey: ["allBookings"] });
+    },
+  });
+}
+
+export function useCancelPaidBooking() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (bookingId: bigint) => {
+      if (!actor) throw new Error("Not connected");
+      await (actor as any).cancelPaidBooking(bookingId);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["myBookings"] });
+      qc.invalidateQueries({ queryKey: ["allBookings"] });
+      qc.invalidateQueries({ queryKey: ["propertyBookings"] });
+    },
+  });
+}
+
 export function useConfirmBooking() {
   const { actor } = useActor();
   const qc = useQueryClient();

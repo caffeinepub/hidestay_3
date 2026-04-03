@@ -3,12 +3,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRouter } from "@tanstack/react-router";
+import { format } from "date-fns";
 import {
   AlertCircle,
   Bell,
   Building2,
   Calendar,
   CheckCircle2,
+  CreditCard,
+  ExternalLink,
   Inbox,
   PlusCircle,
 } from "lucide-react";
@@ -30,6 +33,13 @@ export default function OwnerDashboardPage() {
     </RouteGuard>
   );
 }
+
+const bookingStatusColors: Record<string, string> = {
+  paid: "bg-green-100 text-green-700 border-green-200",
+  pending: "bg-yellow-100 text-yellow-700 border-yellow-200",
+  cancelled: "bg-red-100 text-red-700 border-red-200",
+  rejected: "bg-gray-100 text-gray-600 border-gray-200",
+};
 
 function OwnerDashboardInner() {
   const router = useRouter();
@@ -62,6 +72,11 @@ function OwnerDashboardInner() {
   const pendingBookings = myBookings.filter(
     (b) => b.status === "pending",
   ).length;
+
+  // Recent bookings: last 5 sorted by start date descending
+  const recentBookings = [...myBookings]
+    .sort((a, b) => Number(b.startDate - a.startDate))
+    .slice(0, 5);
 
   return (
     <div className="container max-w-6xl mx-auto px-4 py-10">
@@ -111,7 +126,7 @@ function OwnerDashboardInner() {
           <AlertCircle className="w-5 h-5 text-yellow-600 shrink-0" />
           <p className="text-sm text-yellow-800">
             Your owner account is pending admin approval. You can create
-            listings but they won't be visible to students until approved.
+            listings but they won&apos;t be visible to students until approved.
           </p>
         </div>
       )}
@@ -190,7 +205,7 @@ function OwnerDashboardInner() {
       </div>
 
       {/* Quick links — 2 cols on mobile, 4 cols on lg */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
         <Button
           variant="outline"
           className="h-14 text-sm"
@@ -233,6 +248,119 @@ function OwnerDashboardInner() {
             </Badge>
           )}
         </Button>
+      </div>
+
+      {/* Recent Bookings Section */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-display font-semibold text-xl flex items-center gap-2">
+            <CreditCard className="w-5 h-5 text-primary" /> Recent Bookings
+          </h2>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.navigate({ to: "/owner/listings" })}
+            className="text-xs gap-1 text-muted-foreground hover:text-foreground"
+            data-ocid="owner.all_bookings.button"
+          >
+            View All <ExternalLink className="w-3 h-3" />
+          </Button>
+        </div>
+
+        {bookingsLoading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-16 w-full rounded-xl" />
+            ))}
+          </div>
+        ) : recentBookings.length === 0 ? (
+          <div
+            className="bg-card border border-border rounded-xl p-8 text-center"
+            data-ocid="owner.bookings.empty_state"
+          >
+            <Calendar className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">
+              No bookings yet. They&apos;ll appear here once students book your
+              properties.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {recentBookings.map((booking, i) => {
+              const isPaidBooking = booking.totalPrice > 0n;
+              // Find matching property title
+              const prop = myProperties.find(
+                (p) => p.id.toString() === booking.propertyId.toString(),
+              );
+
+              return (
+                <div
+                  key={booking.id.toString()}
+                  className="bg-card border border-border rounded-xl px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  data-ocid={`owner.bookings.item.${i + 1}`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                      <span className="font-medium text-sm truncate">
+                        {prop?.title ?? `Property #${booking.propertyIdText}`}
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className={`text-xs border ${
+                          bookingStatusColors[booking.status] ?? ""
+                        }`}
+                      >
+                        {booking.status}
+                      </Badge>
+                      {isPaidBooking && (
+                        <Badge
+                          variant="outline"
+                          className="text-xs bg-green-50 text-green-700 border-green-200"
+                        >
+                          Paid
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {format(
+                        Number(booking.startDate / 1_000_000n),
+                        "MMM d, yyyy",
+                      )}{" "}
+                      &bull; {booking.userDetails.name} &bull;{" "}
+                      {booking.userDetails.phone}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    {isPaidBooking ? (
+                      <p className="font-bold text-sm">
+                        ₹{Number(booking.totalPrice).toLocaleString("en-IN")}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-blue-600 font-medium">
+                        Free Visit
+                      </p>
+                    )}
+                    {prop && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() =>
+                          router.navigate({
+                            to: `/owner/listings/${prop.id.toString()}/bookings` as any,
+                          })
+                        }
+                        data-ocid={`owner.booking_detail.button.${i + 1}`}
+                      >
+                        Details <ExternalLink className="w-3 h-3 ml-1" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

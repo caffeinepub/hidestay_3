@@ -3,12 +3,16 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "@tanstack/react-router";
 import { format } from "date-fns";
-import { AlertTriangle, Building2, Calendar } from "lucide-react";
+import { AlertTriangle, Building2, Calendar, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import RouteGuard from "../components/RouteGuard";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
-import { useCancelBooking, useMyBookings } from "../hooks/useQueries";
+import {
+  useCancelBooking,
+  useCancelPaidBooking,
+  useMyBookings,
+} from "../hooks/useQueries";
 
 const statusColors: Record<string, string> = {
   paid: "bg-green-100 text-green-700 border-green-200",
@@ -30,13 +34,25 @@ function MyBookingsInner() {
   const principal = identity?.getPrincipal();
   const { data: bookings, isLoading } = useMyBookings(principal);
   const cancelMutation = useCancelBooking();
+  const cancelPaidMutation = useCancelPaidBooking();
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
+  const [confirmRefundId, setConfirmRefundId] = useState<string | null>(null);
 
-  const handleCancel = async (bookingId: bigint) => {
+  const handleCancelVisit = async (bookingId: bigint) => {
     try {
       await cancelMutation.mutateAsync(bookingId);
       toast.success("Booking cancelled successfully");
       setConfirmCancelId(null);
+    } catch {
+      toast.error("Failed to cancel booking. Please try again.");
+    }
+  };
+
+  const handleCancelPaid = async (bookingId: bigint) => {
+    try {
+      await cancelPaidMutation.mutateAsync(bookingId);
+      toast.success("Booking cancelled and refund initiated");
+      setConfirmRefundId(null);
     } catch {
       toast.error("Failed to cancel booking. Please try again.");
     }
@@ -78,12 +94,21 @@ function MyBookingsInner() {
       ) : (
         <div className="space-y-4">
           {bookings.map((booking, i) => {
-            const isVisit = booking.totalPrice === 0n;
+            const isPaidBooking = booking.totalPrice > 0n;
+            const isPaid = booking.status === "paid";
             const isPending = booking.status === "pending";
+            const isCancelled =
+              booking.status === "cancelled" || booking.status === "rejected";
+
             const isCancellingThis =
               cancelMutation.isPending &&
               confirmCancelId === booking.id.toString();
-            const showConfirm = confirmCancelId === booking.id.toString();
+            const isRefundingThis =
+              cancelPaidMutation.isPending &&
+              confirmRefundId === booking.id.toString();
+
+            const showCancelConfirm = confirmCancelId === booking.id.toString();
+            const showRefundConfirm = confirmRefundId === booking.id.toString();
 
             return (
               <div
@@ -101,14 +126,12 @@ function MyBookingsInner() {
                       <Badge
                         variant="outline"
                         className={
-                          isVisit
+                          !isPaidBooking
                             ? "bg-blue-50 text-blue-700 border-blue-200 text-xs"
-                            : isPending
-                              ? "bg-yellow-50 text-yellow-700 border-yellow-200 text-xs"
-                              : "bg-green-50 text-green-700 border-green-200 text-xs"
+                            : "bg-green-50 text-green-700 border-green-200 text-xs"
                         }
                       >
-                        {isVisit ? "Visit Booking" : "Paid Booking"}
+                        {!isPaidBooking ? "Visit Booking" : "Paid Booking"}
                       </Badge>
                       {/* Status badge */}
                       <Badge
@@ -136,7 +159,7 @@ function MyBookingsInner() {
 
                   <div className="flex flex-col items-end gap-2">
                     <div className="text-right">
-                      {isVisit ? (
+                      {!isPaidBooking ? (
                         <p className="font-semibold text-blue-600">Free</p>
                       ) : (
                         <p className="font-bold text-lg">
@@ -144,12 +167,12 @@ function MyBookingsInner() {
                         </p>
                       )}
                       <p className="text-xs text-muted-foreground">
-                        {isVisit ? "Visit booking" : "Advance paid"}
+                        {!isPaidBooking ? "Visit booking" : "Advance paid"}
                       </p>
                     </div>
 
-                    {/* Cancel button for pending bookings */}
-                    {isPending && !showConfirm && (
+                    {/* Cancel button for pending visit bookings (free) */}
+                    {!isPaidBooking && isPending && !showCancelConfirm && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -162,11 +185,45 @@ function MyBookingsInner() {
                         Cancel Booking
                       </Button>
                     )}
+
+                    {/* Cancel (no refund) for paid bookings still pending Stripe */}
+                    {isPaidBooking && isPending && !showCancelConfirm && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-destructive border-destructive/30 hover:bg-destructive/10 text-xs"
+                        onClick={() =>
+                          setConfirmCancelId(booking.id.toString())
+                        }
+                        data-ocid={`bookings.delete_button.${i + 1}`}
+                      >
+                        Cancel Booking
+                      </Button>
+                    )}
+
+                    {/* Cancel & Refund for confirmed paid bookings */}
+                    {isPaidBooking &&
+                      isPaid &&
+                      !showRefundConfirm &&
+                      !isCancelled && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-destructive border-destructive/30 hover:bg-destructive/10 text-xs gap-1"
+                          onClick={() =>
+                            setConfirmRefundId(booking.id.toString())
+                          }
+                          data-ocid={`bookings.delete_button.${i + 1}`}
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                          Cancel & Refund
+                        </Button>
+                      )}
                   </div>
                 </div>
 
-                {/* Inline cancel confirmation */}
-                {showConfirm && (
+                {/* Inline cancel confirmation (for visit/pending paid) */}
+                {showCancelConfirm && (
                   <div className="mt-3 pt-3 border-t border-border flex items-center gap-3 bg-red-50/50 -mx-5 -mb-5 px-5 pb-4 rounded-b-xl">
                     <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />
                     <p className="text-sm flex-1">
@@ -187,11 +244,45 @@ function MyBookingsInner() {
                         variant="destructive"
                         size="sm"
                         className="text-xs"
-                        onClick={() => handleCancel(booking.id)}
+                        onClick={() => handleCancelVisit(booking.id)}
                         disabled={isCancellingThis}
                         data-ocid={`bookings.confirm_button.${i + 1}`}
                       >
                         {isCancellingThis ? "Cancelling..." : "Yes, Cancel"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Inline refund confirmation (for paid bookings) */}
+                {showRefundConfirm && (
+                  <div className="mt-3 pt-3 border-t border-border flex items-center gap-3 bg-red-50/50 -mx-5 -mb-5 px-5 pb-4 rounded-b-xl">
+                    <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />
+                    <p className="text-sm flex-1">
+                      Cancel this booking? Your advance payment will be refunded
+                      to your original payment method.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => setConfirmRefundId(null)}
+                        disabled={isRefundingThis}
+                        data-ocid={`bookings.cancel_button.${i + 1}`}
+                      >
+                        No
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="text-xs gap-1"
+                        onClick={() => handleCancelPaid(booking.id)}
+                        disabled={isRefundingThis}
+                        data-ocid={`bookings.confirm_button.${i + 1}`}
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        {isRefundingThis ? "Processing..." : "Yes, Refund Me"}
                       </Button>
                     </div>
                   </div>

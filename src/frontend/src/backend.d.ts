@@ -213,7 +213,9 @@ export interface backendInterface {
     blockUser(user: Principal): Promise<void>;
     bookProperty(booking: Booking): Promise<void>;
     cancelBooking(bookingId: bigint): Promise<void>;
+    cancelPaidBooking(bookingId: bigint): Promise<void>;
     confirmBooking(bookingId: bigint): Promise<void>;
+    confirmStripeBooking(bookingId: bigint, sessionId: string): Promise<void>;
     rejectBooking(bookingId: bigint): Promise<void>;
     createAnnouncement(title: string, message: string, expiresAt: Time | null): Promise<void>;
     createCheckoutSession(items: Array<ShoppingItem>, successUrl: string, cancelUrl: string): Promise<string>;
