@@ -212,6 +212,9 @@ export interface backendInterface {
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     blockUser(user: Principal): Promise<void>;
     bookProperty(booking: Booking): Promise<void>;
+    cancelBooking(bookingId: bigint): Promise<void>;
+    confirmBooking(bookingId: bigint): Promise<void>;
+    rejectBooking(bookingId: bigint): Promise<void>;
     createAnnouncement(title: string, message: string, expiresAt: Time | null): Promise<void>;
     createCheckoutSession(items: Array<ShoppingItem>, successUrl: string, cancelUrl: string): Promise<string>;
     createInquiry(propertyId: bigint, studentName: string, studentPhone: string, inquiryType: Variant_bookVisit_contactOwner, message: string): Promise<void>;

@@ -232,6 +232,52 @@ export function useBookProperty() {
   });
 }
 
+export function useCancelBooking() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (bookingId: bigint) => {
+      if (!actor) throw new Error("Not connected");
+      await (actor as any).cancelBooking(bookingId);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["myBookings"] });
+      qc.invalidateQueries({ queryKey: ["allBookings"] });
+      qc.invalidateQueries({ queryKey: ["propertyBookings"] });
+    },
+  });
+}
+
+export function useConfirmBooking() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (bookingId: bigint) => {
+      if (!actor) throw new Error("Not connected");
+      await (actor as any).confirmBooking(bookingId);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["allBookings"] });
+      qc.invalidateQueries({ queryKey: ["propertyBookings"] });
+    },
+  });
+}
+
+export function useRejectBooking() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (bookingId: bigint) => {
+      if (!actor) throw new Error("Not connected");
+      await (actor as any).rejectBooking(bookingId);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["allBookings"] });
+      qc.invalidateQueries({ queryKey: ["propertyBookings"] });
+    },
+  });
+}
+
 // === Admin User Approval ===
 export function useListApprovals() {
   const { actor, isFetching } = useActor();

@@ -7,7 +7,7 @@ import Runtime "mo:core/Runtime";
 import Principal "mo:core/Principal";
 import Iter "mo:core/Iter";
 import Set "mo:core/Set";
-import Migration "migration";
+
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
 import Stripe "stripe/stripe";
@@ -16,7 +16,7 @@ import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
 import UserApproval "user-approval/approval";
 
-(with migration = Migration.run)
+
 actor {
   // Mixin with role-based access control
   let accessControlState = AccessControl.initState();
@@ -393,6 +393,23 @@ actor {
       student = caller;
     };
     bookingList.add(nextBookingId, newBooking);
+
+    // Notify owner of new booking/visit request
+    let notifMsg = if (booking.status == #pending) {
+      "New visit booking request for your property: " # property.title
+    } else {
+      "New booking confirmed for your property: " # property.title
+    };
+    let notif : Notification = {
+      id = nextNotificationId;
+      ownerPrincipal = property.owner;
+      message = notifMsg;
+      timestamp = Time.now();
+      isRead = false;
+      relatedInquiryId = null;
+    };
+    notificationsList.add(nextNotificationId, notif);
+    nextNotificationId += 1;
     nextBookingId += 1;
   };
 
@@ -426,6 +443,62 @@ actor {
 
   func getUserBookingsInternal(user : Principal) : [Booking] {
     bookingList.filter(func(_, b) { b.student == user }).values().toArray();
+  };
+
+  public shared ({ caller }) func cancelBooking(bookingId : Nat) : async () {
+    checkBlocked(caller);
+    let booking = switch (bookingList.get(bookingId)) {
+      case (null) { Runtime.trap("Booking not found") };
+      case (?b) { b };
+    };
+    if (booking.student != caller and not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Can only cancel your own bookings");
+    };
+    if (booking.status != #pending) {
+      Runtime.trap("Only pending bookings can be cancelled");
+    };
+    let updated : Booking = { booking with status = #cancelled };
+    bookingList.add(bookingId, updated);
+  };
+
+  public shared ({ caller }) func confirmBooking(bookingId : Nat) : async () {
+    checkBlocked(caller);
+    let booking = switch (bookingList.get(bookingId)) {
+      case (null) { Runtime.trap("Booking not found") };
+      case (?b) { b };
+    };
+    let property = switch (propertyList.get(booking.propertyId)) {
+      case (null) { Runtime.trap("Property not found") };
+      case (?p) { p };
+    };
+    if (property.owner != caller and not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Only property owner can confirm bookings");
+    };
+    if (booking.status != #pending) {
+      Runtime.trap("Only pending bookings can be confirmed");
+    };
+    let updated : Booking = { booking with status = #paid };
+    bookingList.add(bookingId, updated);
+  };
+
+  public shared ({ caller }) func rejectBooking(bookingId : Nat) : async () {
+    checkBlocked(caller);
+    let booking = switch (bookingList.get(bookingId)) {
+      case (null) { Runtime.trap("Booking not found") };
+      case (?b) { b };
+    };
+    let property = switch (propertyList.get(booking.propertyId)) {
+      case (null) { Runtime.trap("Property not found") };
+      case (?p) { p };
+    };
+    if (property.owner != caller and not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+      Runtime.trap("Unauthorized: Only property owner can reject bookings");
+    };
+    if (booking.status != #pending) {
+      Runtime.trap("Only pending bookings can be rejected");
+    };
+    let updated : Booking = { booking with status = #rejected };
+    bookingList.add(bookingId, updated);
   };
 
   // Profiles

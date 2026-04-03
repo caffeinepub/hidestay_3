@@ -59,6 +59,10 @@ function OwnerDashboardInner() {
   const notifCount = Number(unreadCount ?? BigInt(0));
   const notifDisplay = notifCount > 9 ? "9+" : notifCount.toString();
 
+  const pendingBookings = myBookings.filter(
+    (b) => b.status === "pending",
+  ).length;
+
   return (
     <div className="container max-w-6xl mx-auto px-4 py-10">
       <div className="flex items-center justify-between mb-8">
@@ -185,34 +189,47 @@ function OwnerDashboardInner() {
         </Card>
       </div>
 
-      {/* Quick links */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Quick links — 2 cols on mobile, 4 cols on lg */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Button
           variant="outline"
-          className="h-14 text-base"
+          className="h-14 text-sm"
           onClick={() => router.navigate({ to: "/owner/listings" })}
           data-ocid="owner.manage_listings.button"
         >
-          <Building2 className="w-5 h-5 mr-2" /> Manage My Listings
+          <Building2 className="w-4 h-4 mr-2" /> Manage Listings
         </Button>
         <Button
           variant="outline"
-          className="h-14 text-base"
+          className="h-14 text-sm"
           onClick={() => router.navigate({ to: "/owner/listings/new" })}
           data-ocid="owner.create_listing.button"
         >
-          <PlusCircle className="w-5 h-5 mr-2" /> Create New Listing
+          <PlusCircle className="w-4 h-4 mr-2" /> Add Listing
         </Button>
         <Button
           variant="outline"
-          className="h-14 text-base relative"
+          className="h-14 text-sm relative"
           onClick={() => router.navigate({ to: "/owner/leads" })}
           data-ocid="owner.view_leads.button"
         >
-          <Inbox className="w-5 h-5 mr-2" /> View Leads
+          <Inbox className="w-4 h-4 mr-2" /> View Leads
           {pendingLeads > 0 && (
-            <Badge className="ml-2 bg-amber-100 text-amber-700 border-amber-200 border text-xs">
+            <Badge className="ml-1 bg-amber-100 text-amber-700 border-amber-200 border text-xs">
               {pendingLeads}
+            </Badge>
+          )}
+        </Button>
+        <Button
+          variant="outline"
+          className="h-14 text-sm relative"
+          onClick={() => router.navigate({ to: "/owner/listings" })}
+          data-ocid="owner.view_bookings.button"
+        >
+          <Calendar className="w-4 h-4 mr-2" /> View Bookings
+          {pendingBookings > 0 && (
+            <Badge className="ml-1 bg-blue-100 text-blue-700 border-blue-200 border text-xs">
+              {pendingBookings}
             </Badge>
           )}
         </Button>

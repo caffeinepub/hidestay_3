@@ -189,6 +189,9 @@ export interface _SERVICE {
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'blockUser' : ActorMethod<[Principal], undefined>,
   'bookProperty' : ActorMethod<[Booking], undefined>,
+  'cancelBooking' : ActorMethod<[bigint], undefined>,
+  'confirmBooking' : ActorMethod<[bigint], undefined>,
+  'rejectBooking' : ActorMethod<[bigint], undefined>,
   'createAnnouncement' : ActorMethod<[string, string, [] | [Time]], undefined>,
   'createCheckoutSession' : ActorMethod<
     [Array<ShoppingItem>, string, string],

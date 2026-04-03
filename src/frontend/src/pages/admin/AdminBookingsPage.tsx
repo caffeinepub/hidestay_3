@@ -70,45 +70,73 @@ function AdminBookingsInner() {
               <TableRow>
                 <TableHead>Student</TableHead>
                 <TableHead>Property ID</TableHead>
-                <TableHead>Dates</TableHead>
-                <TableHead>Total</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Amount</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {bookings.map((b, i) => (
-                <TableRow
-                  key={b.id.toString()}
-                  data-ocid={`admin_bookings.item.${i + 1}`}
-                >
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">{b.userDetails.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {b.userDetails.email}
-                      </p>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    #{b.propertyIdText}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {format(Number(b.startDate / 1_000_000n), "MMM d")} —{" "}
-                    {format(Number(b.endDate / 1_000_000n), "MMM d, yyyy")}
-                  </TableCell>
-                  <TableCell className="font-semibold">
-                    ₹{Number(b.totalPrice).toLocaleString()}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      className={`text-xs border ${statusColors[b.status] || ""}`}
-                      variant="outline"
-                    >
-                      {b.status}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {bookings.map((b, i) => {
+                const isVisit = b.totalPrice === 0n;
+                return (
+                  <TableRow
+                    key={b.id.toString()}
+                    data-ocid={`admin_bookings.item.${i + 1}`}
+                  >
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{b.userDetails.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {b.userDetails.phone || b.userDetails.email}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      #{b.propertyIdText}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className={
+                          isVisit
+                            ? "bg-blue-50 text-blue-700 border-blue-200 text-xs"
+                            : "bg-green-50 text-green-700 border-green-200 text-xs"
+                        }
+                      >
+                        {isVisit ? "Visit" : "Paid"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {format(Number(b.startDate / 1_000_000n), "MMM d")}
+                      {b.startDate !== b.endDate && (
+                        <>
+                          {" — "}
+                          {format(
+                            Number(b.endDate / 1_000_000n),
+                            "MMM d, yyyy",
+                          )}
+                        </>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-semibold">
+                      {isVisit ? (
+                        <span className="text-blue-600 text-sm">Free</span>
+                      ) : (
+                        `₹${Number(b.totalPrice).toLocaleString("en-IN")}`
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        className={`text-xs border ${statusColors[b.status] || ""}`}
+                        variant="outline"
+                      >
+                        {b.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         )}

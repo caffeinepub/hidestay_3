@@ -1,70 +1,47 @@
-# Hidestay – Super Admin Panel (Version 8)
+# Hidestay - Phase 1 Booking Flow
 
 ## Current State
 
-Hidestay is a student rental marketplace with three roles: Student, Owner, Admin.
+The app already has:
+- `BookingPage.tsx` at `/booking/:propertyId` — only does Stripe paid booking (selects dates, enters details, immediately goes to Stripe checkout)
+- `MyBookingsPage.tsx` at `/my-bookings` — shows student's booking history
+- `AdminBookingsPage.tsx` at `/admin/bookings` — admin view of all bookings
+- `ListingBookingsPage.tsx` at `/owner/listings/:id/bookings` — owner view of bookings per property
+- Backend: `bookProperty`, `getBookings`, `getUserBookings`, `getPropertyBookings` all exist
+- Booking statuses: `pending`, `paid`, `cancelled`, `rejected`
 
-- Backend: Motoko with authorization, blob-storage, http-outcalls, stripe, user-approval components.
-- Authentication: Simulated OTP for students/owners; email+password for admins stored in localStorage.
-- Admin panel already has: `/admin/login`, `/admin/create`, `/admin/dashboard`, `/admin/listings`, `/admin/users`, `/admin/bookings`, `/admin/stripe`, `/admin/reviews`.
-- Admin dashboard shows: total properties, approved listings, pending listings, total bookings, approved/pending users.
-- Admin listings: view all, approve/reject property listings.
-- Admin users: approve/reject owners via user-approval system.
-- Admin bookings: view all bookings.
-- Admin reviews: moderate (delete) reviews.
-- No analytics tracking, no report/complaint system, no announcements, no payment management page, no simulated 2FA, no user block/unblock (only approve/reject), no verified badge on listings.
+Issue: The current `BookingPage` skips directly to Stripe, making it hard to do a free visit booking. There's no booking type selection, no confirmation screen, and no cancellation UI.
 
 ## Requested Changes (Diff)
 
 ### Add
-- **Analytics tracking (backend):** Track property views (increment view count per property), track booking conversions, track daily active users (session logs per day).
-- **Report/Complaint system (backend + frontend):** New `Report` type stored in backend. "Report this listing" button on `PropertyDetailPage`. Admin panel page `/admin/reports` to review and take action (remove listing / block user).
-- **Announcements system (backend + frontend):** Admin can create in-app announcements. Users see announcements in a banner/notification on their next app open. Stored in backend.
-- **Payment management page:** `/admin/payments` -- pulls real Stripe transaction data via `http-outcalls` to Stripe API. Shows transaction list with amount, status, customer, date.
-- **Simulated 2FA OTP for admin login:** After email+password, show OTP input screen with 6-digit code (same simulated pattern as student OTP). 
-- **Block/Unblock users:** In admin users page, add block/unblock action alongside approve/reject. Blocked users cannot log in or perform actions.
-- **Verified badge on listings:** Admin can mark a property as "verified" (separate from approved). Verified badge shows on property cards and detail page.
-- **Analytics dashboard page:** `/admin/analytics` with charts showing daily active users, most viewed properties, booking conversion rate.
-- **New admin quick-link buttons:** Reports, Payments, Analytics added to admin dashboard.
-- **"Report this listing" button:** On `PropertyDetailPage`, logged-in users can submit a report with a reason.
+- **Booking type selection**: At start of booking flow, student selects "Book a Visit" (free) or "Book Now" (paid via Stripe)
+- **Visit Booking flow**: Free, just saves booking with status `pending`, shows confirmation screen
+- **Booking confirmation screen**: After submitting (either type), show a summary card with booking details, property name, date, booking type, and a shareable confirmation message
+- **Cancellation UI**: In `MyBookingsPage`, add a "Cancel" button on `pending` bookings; calls a cancel action that updates status to `cancelled`
+- **`cancelBooking` backend method**: Add to backend if not present
+- **Owner bookings section**: In `OwnerDashboardPage`, add a quick-link button to view bookings; update `ListingBookingsPage` to show booking type and allow owner to confirm/reject visits
+- **In-app notification to owner**: When a visit booking is made, trigger notification in backend
 
 ### Modify
-- **Admin dashboard stats:** Add Total Users count, Active Listings count, Total Leads count to existing stats.
-- **Admin listings page:** Add "Verify" button (marks property as verified), "Remove" button (delete listing), filter by status (approved/pending/verified).
-- **Admin users page:** Add block/unblock buttons, show user role (student/owner), show profile name.
-- **Backend `Property` type:** Add `verified: Bool` and `viewCount: Nat` fields.
-- **Backend:** Add analytics tracking functions, report functions, announcement functions, user blocking.
-- **`PropertyCard` component:** Show verified badge when property is verified.
-- **`main.tsx`:** Ensure `AuthProvider` wraps the app (prevent "something went wrong" bug).
-- **routeTree:** Add `/admin/reports`, `/admin/payments`, `/admin/analytics` routes.
+- `BookingPage.tsx`: Add booking type step (visit vs paid), handle visit booking path (no Stripe), show confirmation after booking
+- `MyBookingsPage.tsx`: Add cancel button for pending bookings, show booking type label
+- `OwnerDashboardPage.tsx`: Add bookings quick-link
+- `AdminBookingsPage.tsx`: Show booking type column if available
 
 ### Remove
-- Nothing removed.
+- Nothing removed
 
 ## Implementation Plan
 
-1. **Backend changes:**
-   - Add `verified: Bool` and `viewCount: Nat` to `Property` type.
-   - Add `Report` type and `reportsList` map with `submitReport`, `getReports`, `resolveReport` functions.
-   - Add `Announcement` type and `announcementsList` map with `createAnnouncement`, `getAnnouncements`, `dismissAnnouncement` functions.
-   - Add `blockedUsers` set with `blockUser`, `unblockUser`, `isUserBlocked` functions.
-   - Add analytics: `trackPropertyView`, `getPropertyViewCounts`, `trackDailyActiveUser`, `getDailyActiveUsers`, `getAnalyticsSummary` functions.
-   - Add `verifyProperty` function (admin only).
-   - Add Stripe payment list via http-outcall: `getStripePayments` function.
-   - Guard blocked users from performing actions.
-
-2. **Frontend new pages:**
-   - `/admin/reports` - AdminReportsPage: table of reports, resolve actions.
-   - `/admin/payments` - AdminPaymentsPage: Stripe transaction list.
-   - `/admin/analytics` - AdminAnalyticsPage: charts/stats for views, DAU, conversions.
-
-3. **Frontend modifications:**
-   - `PropertyDetailPage`: Add "Report this listing" button, call `trackPropertyView` on load.
-   - `AdminDashboardPage`: Add new stats (total users, active listings, leads), add quick-link buttons for reports/payments/analytics.
-   - `AdminListingsPage`: Add Verify and Remove buttons, filter tabs.
-   - `AdminUsersPage`: Add block/unblock, show user name and role.
-   - `AdminLoginPage`: Add simulated 2FA step after login.
-   - `PropertyCard`: Show verified badge.
-   - `useQueries.ts`: Add hooks for new backend functions.
-   - `main.tsx`: Ensure `AuthProvider` is present.
-   - `routeTree.tsx`: Register new routes.
+1. Check if `cancelBooking` exists in backend; if not, add it to `main.mo`
+2. Update `BookingPage.tsx`:
+   - Step 1: Choose booking type (Visit = free, Instant = Stripe paid)
+   - Step 2: Select date + enter details
+   - Step 3: For visit booking → `bookProperty` with status `pending` → show confirmation screen
+   - Step 3: For paid booking → `bookProperty` → Stripe checkout (existing flow)
+3. Add confirmation screen component inline in `BookingPage` with shareable text
+4. Update `MyBookingsPage.tsx`: Add cancel button for `pending` bookings
+5. Update `OwnerDashboardPage.tsx`: Add "View Bookings" quick-link
+6. Update `ListingBookingsPage.tsx`: Show visit vs paid type, allow confirm/reject
+7. Ensure `AuthProvider` / `InternetIdentityProvider` is correctly in `main.tsx` (already present)

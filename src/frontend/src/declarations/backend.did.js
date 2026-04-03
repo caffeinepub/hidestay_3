@@ -227,6 +227,9 @@ export const idlService = IDL.Service({
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'blockUser' : IDL.Func([IDL.Principal], [], []),
   'bookProperty' : IDL.Func([Booking], [], []),
+  'cancelBooking' : IDL.Func([IDL.Nat], [], []),
+  'confirmBooking' : IDL.Func([IDL.Nat], [], []),
+  'rejectBooking' : IDL.Func([IDL.Nat], [], []),
   'createAnnouncement' : IDL.Func([IDL.Text, IDL.Text, IDL.Opt(Time)], [], []),
   'createCheckoutSession' : IDL.Func(
       [IDL.Vec(ShoppingItem), IDL.Text, IDL.Text],
@@ -542,6 +545,9 @@ export const idlFactory = ({ IDL }) => {
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'blockUser' : IDL.Func([IDL.Principal], [], []),
     'bookProperty' : IDL.Func([Booking], [], []),
+  'cancelBooking' : IDL.Func([IDL.Nat], [], []),
+  'confirmBooking' : IDL.Func([IDL.Nat], [], []),
+  'rejectBooking' : IDL.Func([IDL.Nat], [], []),
     'createAnnouncement' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Opt(Time)],
         [],
