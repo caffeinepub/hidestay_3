@@ -7,44 +7,65 @@ import { useInternetIdentity } from "./useInternetIdentity";
 
 const ACTOR_QUERY_KEY = "actor";
 
-// Shared ref so waitForActorReady can access the latest actor outside of React
+// Module-level actor cache so mutations can access it outside React hooks
 let _latestActor: backendInterface | null = null;
+let _actorReadyResolvers: Array<(actor: backendInterface) => void> = [];
 
+/**
+ * Returns the latest actor synchronously, or null if not yet ready.
+ * Used by mutations in useQueries.ts.
+ */
 export function getLatestActor(): backendInterface | null {
   return _latestActor;
 }
 
 /**
- * Wait up to `timeoutMs` for the actor to become available.
- * Call this in mutations instead of checking `actor` directly.
+ * Waits until the actor is ready (up to 10 seconds), then returns it.
+ * Used by mutations in useQueries.ts to avoid race conditions on page load.
  */
 export async function waitForActorReady(
-  getActor: () => backendInterface | null = getLatestActor,
-  timeoutMs = 8000,
+  _getActor?: () => backendInterface | null,
 ): Promise<backendInterface> {
-  const interval = 100;
-  let elapsed = 0;
-  while (elapsed < timeoutMs) {
-    const a = getActor();
-    if (a) return a;
-    await new Promise((r) => setTimeout(r, interval));
-    elapsed += interval;
+  if (_latestActor) {
+    return _latestActor;
   }
-  throw new Error("Actor not ready after timeout");
+  // Wait up to 10 seconds for actor to become available
+  return new Promise<backendInterface>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      _actorReadyResolvers = _actorReadyResolvers.filter((r) => r !== resolve);
+      reject(new Error("Actor not ready after 10 seconds"));
+    }, 10_000);
+
+    const wrappedResolve = (actor: backendInterface) => {
+      clearTimeout(timeout);
+      resolve(actor);
+    };
+    _actorReadyResolvers.push(wrappedResolve);
+  });
+}
+
+function notifyActorReady(actor: backendInterface) {
+  _latestActor = actor;
+  const resolvers = _actorReadyResolvers.splice(0);
+  for (const resolve of resolvers) {
+    resolve(actor);
+  }
 }
 
 export function useActor() {
   const { identity } = useInternetIdentity();
   const queryClient = useQueryClient();
+  const prevActorRef = useRef<backendInterface | null>(null);
+
   const actorQuery = useQuery<backendInterface>({
     queryKey: [ACTOR_QUERY_KEY, identity?.getPrincipal().toString()],
     queryFn: async () => {
       const isAuthenticated = !!identity;
 
       if (!isAuthenticated) {
-        const actor = await createActorWithConfig();
-        _latestActor = actor;
-        return actor;
+        // Return anonymous actor if not authenticated
+        const anonActor = await createActorWithConfig();
+        return anonActor;
       }
 
       const actorOptions = {
@@ -56,32 +77,24 @@ export function useActor() {
       const actor = await createActorWithConfig(actorOptions);
       const adminToken = getSecretParameter("caffeineAdminToken") || "";
       await actor._initializeAccessControlWithSecret(adminToken);
-      _latestActor = actor;
       return actor;
     },
+    // Only refetch when identity changes
     staleTime: Number.POSITIVE_INFINITY,
     enabled: true,
   });
 
-  // Keep _latestActor in sync whenever actorQuery.data changes
-  const prevActorRef = useRef<backendInterface | null>(null);
-  if (actorQuery.data && actorQuery.data !== prevActorRef.current) {
-    prevActorRef.current = actorQuery.data;
-    _latestActor = actorQuery.data;
-  }
-
-  // When the actor changes, invalidate dependent queries
+  // Keep module-level cache in sync and notify any waiting mutations
   useEffect(() => {
-    if (actorQuery.data) {
+    if (actorQuery.data && actorQuery.data !== prevActorRef.current) {
+      prevActorRef.current = actorQuery.data;
+      notifyActorReady(actorQuery.data);
+      // Invalidate dependent queries when actor changes
       queryClient.invalidateQueries({
-        predicate: (query) => {
-          return !query.queryKey.includes(ACTOR_QUERY_KEY);
-        },
+        predicate: (query) => !query.queryKey.includes(ACTOR_QUERY_KEY),
       });
       queryClient.refetchQueries({
-        predicate: (query) => {
-          return !query.queryKey.includes(ACTOR_QUERY_KEY);
-        },
+        predicate: (query) => !query.queryKey.includes(ACTOR_QUERY_KEY),
       });
     }
   }, [actorQuery.data, queryClient]);
@@ -89,6 +102,5 @@ export function useActor() {
   return {
     actor: actorQuery.data || null,
     isFetching: actorQuery.isFetching,
-    getLatestActor,
   };
 }
