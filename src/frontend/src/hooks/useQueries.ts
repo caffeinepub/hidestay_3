@@ -17,7 +17,7 @@ import type {
   Variant_bookVisit_contactOwner,
   Variant_rejected_accepted,
 } from "../backend";
-import { useActor, waitForActorReady } from "./useActor";
+import { getLatestActor, useActor, waitForActorReady } from "./useActor";
 
 // Review type (defined locally as it may not be exported from backend.ts)
 export interface Review {
@@ -71,7 +71,6 @@ export function useIsApproved() {
 }
 
 export function useSaveProfile() {
-  const { getLatestActor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (profile: UserProfile) => {
@@ -86,7 +85,6 @@ export function useSaveProfile() {
 }
 
 export function useRequestApproval() {
-  const { getLatestActor } = useActor();
   return useMutation({
     mutationFn: async () => {
       const a = await waitForActorReady(getLatestActor);
@@ -133,7 +131,6 @@ export function useProperty(id: bigint | undefined) {
 }
 
 export function useListProperty() {
-  const { getLatestActor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (property: Property) => {
