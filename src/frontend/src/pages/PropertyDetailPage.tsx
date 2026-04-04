@@ -26,17 +26,21 @@ import {
   CheckCircle,
   ChevronLeft,
   ChevronRight,
+  Eye,
   Flag,
   Heart,
+  ImagePlus,
   Loader2,
+  Lock,
   MapPin,
   MessageSquare,
   Phone,
   ShieldCheck,
   Star,
   Users,
+  X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   Variant_admin_owner_student,
@@ -141,6 +145,35 @@ function StarDisplay({ rating }: { rating: number }) {
   );
 }
 
+function getReviewPhotosKey(propertyId: bigint, principalSlice: string) {
+  return `hidestay_review_photos_${propertyId}_${principalSlice}`;
+}
+
+function loadReviewPhotos(
+  propertyId: bigint,
+  principalSlice: string,
+): string[] {
+  try {
+    const raw = localStorage.getItem(
+      getReviewPhotosKey(propertyId, principalSlice),
+    );
+    return raw ? (JSON.parse(raw) as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveReviewPhotos(
+  propertyId: bigint,
+  principalSlice: string,
+  photos: string[],
+) {
+  localStorage.setItem(
+    getReviewPhotosKey(propertyId, principalSlice),
+    JSON.stringify(photos),
+  );
+}
+
 function ReviewsSection({ propertyId }: { propertyId: bigint }) {
   const { session, currentRole } = useAuth();
   const { data: profile } = useCallerProfile();
@@ -157,8 +190,32 @@ function ReviewsSection({ propertyId }: { propertyId: bigint }) {
     (r) => r.student.toString().slice(-8) === session?.phone?.slice(-8),
   );
 
+  const myPrincipalSlice = session?.phone?.slice(-8) ?? "";
+
   const [rating, setRating] = useState(myReview ? Number(myReview.rating) : 0);
   const [comment, setComment] = useState(myReview?.comment ?? "");
+  const [selectedPhotos, setSelectedPhotos] = useState<string[]>([]);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (selectedPhotos.length + files.length > 3) {
+      toast.error("Maximum 3 photos allowed");
+      return;
+    }
+    for (const file of files.slice(0, 3 - selectedPhotos.length)) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setSelectedPhotos((prev) => {
+          if (prev.length >= 3) return prev;
+          return [...prev, ev.target?.result as string];
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+    // Reset input
+    e.target.value = "";
+  };
 
   const handleSubmit = async () => {
     if (rating === 0) {
@@ -175,6 +232,11 @@ function ReviewsSection({ propertyId }: { propertyId: bigint }) {
         rating: BigInt(rating),
         comment: comment.trim(),
       });
+      // Save photos to localStorage
+      if (selectedPhotos.length > 0 && myPrincipalSlice) {
+        saveReviewPhotos(propertyId, myPrincipalSlice, selectedPhotos);
+      }
+      setSelectedPhotos([]);
       toast.success(myReview ? "Review updated!" : "Review posted!");
     } catch {
       toast.error("Failed to submit review. Please try again.");
@@ -212,6 +274,59 @@ function ReviewsSection({ propertyId }: { propertyId: bigint }) {
             onChange={(e) => setComment(e.target.value)}
             data-ocid="reviews.textarea"
           />
+
+          {/* Photo upload */}
+          <div className="mt-3">
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={handlePhotoSelect}
+            />
+            <div className="flex items-center gap-2 flex-wrap">
+              {selectedPhotos.map((photo, i) => (
+                <div
+                  key={photo.slice(-20)}
+                  className="relative w-16 h-16 rounded-lg overflow-hidden border border-border"
+                >
+                  <img
+                    src={photo}
+                    alt={`Selected ${i + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    className="absolute top-0.5 right-0.5 bg-background/80 rounded-full p-0.5 hover:bg-background transition-colors"
+                    onClick={() =>
+                      setSelectedPhotos((prev) =>
+                        prev.filter((_, idx) => idx !== i),
+                      )
+                    }
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              {selectedPhotos.length < 3 && (
+                <button
+                  type="button"
+                  className="w-16 h-16 rounded-lg border-2 border-dashed border-border hover:border-primary/50 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors"
+                  onClick={() => photoInputRef.current?.click()}
+                  data-ocid="reviews.photo.upload_button"
+                >
+                  <ImagePlus className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+            {selectedPhotos.length > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {selectedPhotos.length}/3 photos selected
+              </p>
+            )}
+          </div>
+
           <Button
             className="mt-3"
             onClick={handleSubmit}
@@ -261,12 +376,15 @@ function ReviewsSection({ propertyId }: { propertyId: bigint }) {
           {reviews.map((review, idx) => {
             const principalStr = review.student.toString();
             const initials = principalStr.slice(0, 2).toUpperCase();
+            const principalSlice = principalStr.slice(-8);
             const dateStr = new Date(
               Number(review.timestamp / 1_000_000n),
             ).toLocaleDateString("en-IN", {
               month: "short",
               year: "numeric",
             });
+            const photos = loadReviewPhotos(propertyId, principalSlice);
+
             return (
               <div
                 key={principalStr}
@@ -286,6 +404,19 @@ function ReviewsSection({ propertyId }: { propertyId: bigint }) {
                   <p className="text-sm text-foreground leading-relaxed">
                     {review.comment}
                   </p>
+                  {/* Review Photos */}
+                  {photos.length > 0 && (
+                    <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
+                      {photos.map((photo, photoIdx) => (
+                        <img
+                          key={photo.slice(-20)}
+                          src={photo}
+                          alt={`Attached ${photoIdx + 1}`}
+                          className="h-20 w-20 rounded-lg object-cover shrink-0 border border-border"
+                        />
+                      ))}
+                    </div>
+                  )}
                   <p className="text-xs text-muted-foreground mt-1 font-mono truncate">
                     {principalStr.slice(0, 12)}...
                   </p>
@@ -326,7 +457,10 @@ export default function PropertyDetailPage() {
     property ? property.id : undefined,
   );
 
-  // Track property view on mount - using property id as stable dep
+  // Contact reveal state for students
+  const [contactRevealed, setContactRevealed] = useState(false);
+  const [revealLoading, setRevealLoading] = useState(false);
+
   const propertyId = property?.id;
   const trackViewMutate = trackView.mutate;
   useEffect(() => {
@@ -335,7 +469,6 @@ export default function PropertyDetailPage() {
     }
   }, [propertyId, trackViewMutate]);
 
-  // Report dialog state
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [reportDescription, setReportDescription] = useState("");
@@ -412,6 +545,16 @@ export default function PropertyDetailPage() {
     });
   }
 
+  async function handleRevealContact() {
+    setRevealLoading(true);
+    try {
+      fireContactInquiry();
+      setContactRevealed(true);
+    } finally {
+      setRevealLoading(false);
+    }
+  }
+
   async function handleSubmitReport(e: React.FormEvent) {
     e.preventDefault();
     if (!property) return;
@@ -469,6 +612,9 @@ export default function PropertyDetailPage() {
     ? property.contactPhone.replace(/\D/g, "")
     : "";
 
+  // Show contact directly for non-students (owner/admin/guest)
+  const showContactDirect = !isAuthenticated || !isStudent;
+
   return (
     <div className="container max-w-5xl mx-auto px-4 sm:px-6 py-10">
       <div className="flex items-center justify-between mb-6">
@@ -482,7 +628,6 @@ export default function PropertyDetailPage() {
           <ChevronLeft className="w-4 h-4 mr-1" /> Back
         </Button>
 
-        {/* Report button - only for logged-in students */}
         {isAuthenticated && isStudent && (
           <Button
             variant="ghost"
@@ -750,44 +895,72 @@ export default function PropertyDetailPage() {
                 <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
                   Contact Owner
                 </p>
-                <a
-                  href={`tel:${property.contactPhone}`}
-                  className="block"
-                  onClick={fireContactInquiry}
-                  data-ocid="property.call.button"
-                >
-                  <Button
-                    className="w-full gap-2"
-                    variant="default"
-                    size="sm"
-                    asChild
-                  >
-                    <span>
-                      <Phone className="w-4 h-4" /> Call Owner
-                    </span>
-                  </Button>
-                </a>
-                {whatsappPhone && (
-                  <a
-                    href={`https://wa.me/${whatsappPhone}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={fireContactInquiry}
-                    data-ocid="property.whatsapp.button"
-                  >
+
+                {/* Students: hide until reveal */}
+                {isAuthenticated && isStudent && !contactRevealed ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/60 rounded-lg px-3 py-2">
+                      <Lock className="w-3.5 h-3.5 shrink-0" />
+                      <span>Contact hidden for privacy</span>
+                    </div>
                     <Button
                       className="w-full gap-2"
                       variant="outline"
                       size="sm"
-                      asChild
+                      onClick={handleRevealContact}
+                      disabled={revealLoading}
+                      data-ocid="property.reveal_contact.button"
                     >
-                      <span>
-                        <WhatsAppIcon className="w-4 h-4 text-green-600" />
-                        WhatsApp
-                      </span>
+                      {revealLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                      Show Contact Details
                     </Button>
-                  </a>
-                )}
+                  </div>
+                ) : showContactDirect || contactRevealed ? (
+                  <div className="space-y-2">
+                    <a
+                      href={`tel:${property.contactPhone}`}
+                      className="block"
+                      onClick={isStudent ? undefined : fireContactInquiry}
+                      data-ocid="property.call.button"
+                    >
+                      <Button
+                        className="w-full gap-2"
+                        variant="default"
+                        size="sm"
+                        asChild
+                      >
+                        <span>
+                          <Phone className="w-4 h-4" /> Call Owner
+                        </span>
+                      </Button>
+                    </a>
+                    {whatsappPhone && (
+                      <a
+                        href={`https://wa.me/${whatsappPhone}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={isStudent ? undefined : fireContactInquiry}
+                        data-ocid="property.whatsapp.button"
+                      >
+                        <Button
+                          className="w-full gap-2"
+                          variant="outline"
+                          size="sm"
+                          asChild
+                        >
+                          <span>
+                            <WhatsAppIcon className="w-4 h-4 text-green-600" />
+                            WhatsApp
+                          </span>
+                        </Button>
+                      </a>
+                    )}
+                  </div>
+                ) : null}
               </div>
             )}
           </div>

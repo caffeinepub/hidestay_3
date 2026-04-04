@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,13 +14,19 @@ import {
   CheckCircle2,
   Clock,
   CreditCard,
+  Flag,
   Megaphone,
   MessageSquare,
   Settings,
+  ShieldCheck,
   Users,
 } from "lucide-react";
 import RouteGuard from "../../components/RouteGuard";
-import { useAnalyticsSummary } from "../../hooks/useQueries";
+import {
+  useAllProperties,
+  useAnalyticsSummary,
+  useGetReports,
+} from "../../hooks/useQueries";
 
 export default function AdminDashboardPage() {
   return (
@@ -32,8 +39,14 @@ export default function AdminDashboardPage() {
 function AdminDashboardInner() {
   const router = useRouter();
   const { data: summary, isLoading: summaryLoading } = useAnalyticsSummary();
+  const { data: allProperties } = useAllProperties();
+  const { data: reports } = useGetReports();
 
-  const pendingReports = 0; // Could be fetched separately if needed
+  const pendingApprovals = (allProperties ?? [])
+    .filter((p) => !p.approved)
+    .slice(0, 5);
+
+  const recentReports = (reports ?? []).slice(0, 5);
 
   const stats = summary
     ? [
@@ -81,7 +94,7 @@ function AdminDashboardInner() {
         },
         {
           label: "Pending Reports",
-          value: pendingReports,
+          value: recentReports.filter((r) => r.status === "pending").length,
           icon: Activity,
           color: "text-orange-500",
         },
@@ -147,7 +160,7 @@ function AdminDashboardInner() {
       </div>
 
       {/* Quick Links */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-10">
         <Button
           variant="outline"
           className="h-14 text-sm"
@@ -228,6 +241,132 @@ function AdminDashboardInner() {
         >
           <Megaphone className="w-4 h-4 mr-2" /> Create Admin
         </Button>
+        <Button
+          variant="outline"
+          className="h-14 text-sm"
+          onClick={() => router.navigate({ to: "/admin/id-verification" })}
+          data-ocid="admin.id_verification.button"
+        >
+          <ShieldCheck className="w-4 h-4 mr-2" /> ID Verification
+        </Button>
+      </div>
+
+      {/* Recent Activity Feed */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Pending Approvals */}
+        <div>
+          <h2 className="font-display font-semibold text-lg mb-3 flex items-center gap-2">
+            <Clock className="w-5 h-5 text-yellow-500" />
+            Pending Approvals
+          </h2>
+          {pendingApprovals.length === 0 ? (
+            <div
+              className="bg-card border border-border rounded-xl p-6 text-center text-sm text-muted-foreground"
+              data-ocid="admin.pending_approvals.empty_state"
+            >
+              <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-green-500" />
+              All listings are approved!
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {pendingApprovals.map((p, i) => (
+                <div
+                  key={p.id.toString()}
+                  className="bg-card border border-border rounded-xl px-4 py-3 flex items-center justify-between gap-3"
+                  data-ocid={`admin.pending_approvals.item.${i + 1}`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-full bg-yellow-50 text-yellow-600 flex items-center justify-center shrink-0">
+                      <Building2 className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{p.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {p.address.city}, {p.address.state}
+                      </p>
+                    </div>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className="text-xs bg-yellow-50 text-yellow-700 border-yellow-200 shrink-0"
+                  >
+                    Pending
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-2 text-xs text-muted-foreground"
+            onClick={() => router.navigate({ to: "/admin/listings" })}
+            data-ocid="admin.view_all_listings.button"
+          >
+            View all listings →
+          </Button>
+        </div>
+
+        {/* Recent Reports */}
+        <div>
+          <h2 className="font-display font-semibold text-lg mb-3 flex items-center gap-2">
+            <Flag className="w-5 h-5 text-red-500" />
+            Recent Reports
+          </h2>
+          {recentReports.length === 0 ? (
+            <div
+              className="bg-card border border-border rounded-xl p-6 text-center text-sm text-muted-foreground"
+              data-ocid="admin.recent_reports.empty_state"
+            >
+              No recent reports.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {recentReports.map((report, i) => (
+                <div
+                  key={report.id.toString()}
+                  className="bg-card border border-border rounded-xl px-4 py-3 flex items-center justify-between gap-3"
+                  data-ocid={`admin.recent_reports.item.${i + 1}`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-full bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+                      <Flag className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {report.reason}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {report.description.slice(0, 60)}...
+                      </p>
+                    </div>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className={`text-xs shrink-0 ${
+                      report.status === "resolved"
+                        ? "bg-green-50 text-green-700 border-green-200"
+                        : report.status === "dismissed"
+                          ? "bg-gray-50 text-gray-600 border-gray-200"
+                          : "bg-red-50 text-red-700 border-red-200"
+                    }`}
+                  >
+                    {report.status}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-2 text-xs text-muted-foreground"
+            onClick={() => router.navigate({ to: "/admin/reports" })}
+            data-ocid="admin.view_all_reports.button"
+          >
+            View all reports →
+          </Button>
+        </div>
       </div>
     </div>
   );

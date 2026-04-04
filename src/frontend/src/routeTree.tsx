@@ -13,6 +13,8 @@ import PaymentCancelPage from "./pages/PaymentCancelPage";
 import PaymentSuccessPage from "./pages/PaymentSuccessPage";
 import PropertyDetailPage from "./pages/PropertyDetailPage";
 import SearchPage from "./pages/SearchPage";
+import StudentAlertsPage from "./pages/StudentAlertsPage";
+import StudentNotificationsPage from "./pages/StudentNotificationsPage";
 import WishlistPage from "./pages/WishlistPage";
 import AdminAnalyticsPage from "./pages/admin/AdminAnalyticsPage";
 import AdminAnnouncementsPage from "./pages/admin/AdminAnnouncementsPage";
@@ -20,6 +22,7 @@ import AdminBookingsPage from "./pages/admin/AdminBookingsPage";
 import AdminCreatePage from "./pages/admin/AdminCreatePage";
 import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
 import AdminForgotPasswordPage from "./pages/admin/AdminForgotPasswordPage";
+import AdminIdVerificationPage from "./pages/admin/AdminIdVerificationPage";
 import AdminListingsPage from "./pages/admin/AdminListingsPage";
 import AdminLoginPage from "./pages/admin/AdminLoginPage";
 import AdminPaymentsPage from "./pages/admin/AdminPaymentsPage";
@@ -88,6 +91,19 @@ const wishlistRoute = createRoute({
   component: WishlistPage,
 });
 
+// Student routes
+const studentNotificationsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/student/notifications",
+  component: StudentNotificationsPage,
+});
+
+const studentAlertsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/student/alerts",
+  component: StudentAlertsPage,
+});
+
 // Auth routes
 const authRoleRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -113,7 +129,6 @@ const authProfileRoute = createRoute({
   component: ProfileSetupPage,
 });
 
-// Keep old /auth/setup for backward compat
 const authSetupRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/auth/setup",
@@ -260,6 +275,12 @@ const adminAnnouncementsRoute = createRoute({
   component: AdminAnnouncementsPage,
 });
 
+const adminIdVerificationRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin/id-verification",
+  component: AdminIdVerificationPage,
+});
+
 export const routeTree = rootRoute.addChildren([
   indexRoute,
   searchRoute,
@@ -267,6 +288,9 @@ export const routeTree = rootRoute.addChildren([
   bookingRoute,
   myBookingsRoute,
   wishlistRoute,
+  // Student
+  studentNotificationsRoute,
+  studentAlertsRoute,
   // Auth
   authRoleRoute,
   authPhoneRoute,
@@ -299,6 +323,7 @@ export const routeTree = rootRoute.addChildren([
   adminPaymentsRoute,
   adminAnalyticsRoute,
   adminAnnouncementsRoute,
+  adminIdVerificationRoute,
 ]);
 
 declare module "@tanstack/react-router" {

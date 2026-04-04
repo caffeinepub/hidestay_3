@@ -14,7 +14,12 @@ import {
   ExternalLink,
   Inbox,
   PlusCircle,
+  ShieldCheck,
+  ShieldX,
+  Upload,
 } from "lucide-react";
+import { useRef, useState } from "react";
+import { toast } from "sonner";
 import { Variant_pending_rejected_accepted } from "../../backend";
 import RouteGuard from "../../components/RouteGuard";
 import { useInternetIdentity } from "../../hooks/useInternetIdentity";
@@ -25,6 +30,8 @@ import {
   useOwnerInquiries,
   useUnreadNotificationCount,
 } from "../../hooks/useQueries";
+import type { IDVRequest } from "../admin/AdminIdVerificationPage";
+import { getIdvRequests } from "../admin/AdminIdVerificationPage";
 
 export default function OwnerDashboardPage() {
   return (
@@ -40,6 +47,205 @@ const bookingStatusColors: Record<string, string> = {
   cancelled: "bg-red-100 text-red-700 border-red-200",
   rejected: "bg-gray-100 text-gray-600 border-gray-200",
 };
+
+function IdVerificationCard({ principal }: { principal: string }) {
+  const [request, setRequest] = useState<IDVRequest | null>(() => {
+    const requests = getIdvRequests();
+    return requests.find((r) => r.principal === principal) ?? null;
+  });
+  const [preview, setPreview] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setPreview(ev.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function handleSubmit() {
+    if (!preview) {
+      toast.error("Please select an ID document");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const newRequest: IDVRequest = {
+        principal,
+        status: "pending",
+        submittedAt: Date.now(),
+        fileDataUrl: preview,
+        notes: "",
+      };
+
+      const existing = getIdvRequests().filter(
+        (r) => r.principal !== principal,
+      );
+      const updated = [newRequest, ...existing];
+      localStorage.setItem("hidestay_idv_requests", JSON.stringify(updated));
+      localStorage.setItem(`hidestay_idv_${principal}`, "pending");
+      setRequest(newRequest);
+      setPreview(null);
+      toast.success(
+        "ID proof submitted for review. Admin will verify within 24 hours.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const localFlag = localStorage.getItem(`hidestay_idv_${principal}`);
+  const isApproved = request?.status === "approved" || localFlag === "approved";
+  const isRejected =
+    request?.status === "rejected" || localFlag?.startsWith("rejected:");
+  const isPending = request?.status === "pending" || localFlag === "pending";
+
+  return (
+    <Card className="border-border shadow-xs">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-primary" />
+          ID Verification
+          {isApproved && (
+            <Badge className="bg-green-100 text-green-700 border-green-200 border ml-auto">
+              <ShieldCheck className="w-3 h-3 mr-1" /> Verified
+            </Badge>
+          )}
+          {isPending && !isApproved && (
+            <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200 border ml-auto">
+              Pending Review
+            </Badge>
+          )}
+          {isRejected && (
+            <Badge className="bg-red-100 text-red-700 border-red-200 border ml-auto">
+              <ShieldX className="w-3 h-3 mr-1" /> Rejected
+            </Badge>
+          )}
+          {!isApproved && !isPending && !isRejected && (
+            <Badge variant="outline" className="text-muted-foreground ml-auto">
+              Not Submitted
+            </Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {isApproved ? (
+          <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
+            <ShieldCheck className="w-5 h-5 text-green-600 shrink-0" />
+            <p className="text-sm text-green-800">
+              Your identity has been verified. A verified badge is displayed on
+              your listings.
+            </p>
+          </div>
+        ) : isPending ? (
+          <div className="flex items-center gap-3 bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3">
+            <AlertCircle className="w-5 h-5 text-yellow-600 shrink-0" />
+            <p className="text-sm text-yellow-800">
+              Your ID proof is under review. Admin will verify within 24 hours.
+            </p>
+          </div>
+        ) : isRejected ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+              <ShieldX className="w-5 h-5 text-red-600 shrink-0" />
+              <p className="text-sm text-red-800">
+                Your ID verification was rejected. Please upload a clearer
+                document.
+              </p>
+            </div>
+            <UploadSection
+              preview={preview}
+              fileRef={fileRef}
+              onFileChange={handleFileChange}
+              onSubmit={handleSubmit}
+              submitting={submitting}
+            />
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Upload a government-issued ID (Aadhar, PAN, Passport) to get a
+              verified badge on your listings.
+            </p>
+            <UploadSection
+              preview={preview}
+              fileRef={fileRef}
+              onFileChange={handleFileChange}
+              onSubmit={handleSubmit}
+              submitting={submitting}
+            />
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function UploadSection({
+  preview,
+  fileRef,
+  onFileChange,
+  onSubmit,
+  submitting,
+}: {
+  preview: string | null;
+  fileRef: React.RefObject<HTMLInputElement | null>;
+  onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onSubmit: () => void;
+  submitting: boolean;
+}) {
+  return (
+    <div className="space-y-3">
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={onFileChange}
+      />
+      <button
+        type="button"
+        className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 transition-colors w-full"
+        onClick={() => fileRef.current?.click()}
+        data-ocid="owner.id_upload.dropzone"
+      >
+        {preview ? (
+          <img
+            src={preview}
+            alt="ID preview"
+            className="max-h-32 mx-auto rounded object-contain"
+          />
+        ) : (
+          <>
+            <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">
+              Click to upload ID proof
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Aadhar, PAN, Passport (JPG/PNG)
+            </p>
+          </>
+        )}
+      </button>
+      {preview && (
+        <Button
+          onClick={onSubmit}
+          disabled={submitting}
+          size="sm"
+          className="w-full"
+          data-ocid="owner.id_upload.submit.button"
+        >
+          <Upload className="w-4 h-4 mr-2" />
+          {submitting ? "Submitting..." : "Submit for Verification"}
+        </Button>
+      )}
+    </div>
+  );
+}
 
 function OwnerDashboardInner() {
   const router = useRouter();
@@ -73,7 +279,6 @@ function OwnerDashboardInner() {
     (b) => b.status === "pending",
   ).length;
 
-  // Recent bookings: last 5 sorted by start date descending
   const recentBookings = [...myBookings]
     .sort((a, b) => Number(b.startDate - a.startDate))
     .slice(0, 5);
@@ -90,7 +295,6 @@ function OwnerDashboardInner() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {/* Notification Bell */}
           <Button
             variant="outline"
             size="sm"
@@ -204,7 +408,7 @@ function OwnerDashboardInner() {
         </Card>
       </div>
 
-      {/* Quick links — 2 cols on mobile, 4 cols on lg */}
+      {/* Quick links */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
         <Button
           variant="outline"
@@ -250,6 +454,13 @@ function OwnerDashboardInner() {
         </Button>
       </div>
 
+      {/* ID Verification Card */}
+      {principal && (
+        <div className="mb-10">
+          <IdVerificationCard principal={principal} />
+        </div>
+      )}
+
       {/* Recent Bookings Section */}
       <div>
         <div className="flex items-center justify-between mb-4">
@@ -288,7 +499,6 @@ function OwnerDashboardInner() {
           <div className="space-y-3">
             {recentBookings.map((booking, i) => {
               const isPaidBooking = booking.totalPrice > 0n;
-              // Find matching property title
               const prop = myProperties.find(
                 (p) => p.id.toString() === booking.propertyId.toString(),
               );

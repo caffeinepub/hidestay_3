@@ -11,6 +11,7 @@ import {
 import { Link, useRouter } from "@tanstack/react-router";
 import {
   Bell,
+  BellRing,
   Building2,
   ChevronDown,
   Heart,
@@ -27,6 +28,7 @@ import {
   useGetActiveAnnouncements,
   useUnreadNotificationCount,
 } from "../hooks/useQueries";
+import { getStudentNotifs } from "../pages/StudentNotificationsPage";
 
 function AnnouncementBanner() {
   const { data: announcements } = useGetActiveAnnouncements();
@@ -86,7 +88,7 @@ function AnnouncementBanner() {
   );
 }
 
-function NotificationBell() {
+function OwnerNotificationBell() {
   const router = useRouter();
   const { data: unreadCount } = useUnreadNotificationCount();
   const count = Number(unreadCount ?? BigInt(0));
@@ -99,6 +101,30 @@ function NotificationBell() {
       onClick={() => router.navigate({ to: "/owner/notifications" })}
       aria-label={`Notifications${count > 0 ? ` (${count} unread)` : ""}`}
       data-ocid="nav.owner.notifications.button"
+    >
+      <Bell className="w-5 h-5" />
+      {count > 0 && (
+        <span className="absolute top-0.5 right-0.5 min-w-[16px] h-[16px] rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold flex items-center justify-center px-0.5">
+          {display}
+        </span>
+      )}
+    </button>
+  );
+}
+
+function StudentNotificationBell({ phone }: { phone: string }) {
+  const router = useRouter();
+  const notifs = getStudentNotifs(phone);
+  const count = notifs.filter((n) => !n.isRead).length;
+  const display = count > 9 ? "9+" : count.toString();
+
+  return (
+    <button
+      type="button"
+      className="relative p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+      onClick={() => router.navigate({ to: "/student/notifications" })}
+      aria-label={`Notifications${count > 0 ? ` (${count} unread)` : ""}`}
+      data-ocid="nav.student.notifications.button"
     >
       <Bell className="w-5 h-5" />
       {count > 0 && (
@@ -183,6 +209,14 @@ export default function Navbar() {
                   >
                     <Heart className="w-4 h-4" /> Wishlist
                   </Link>
+                  <Link
+                    to="/student/alerts"
+                    className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                    data-ocid="nav.student.alerts.link"
+                  >
+                    <BellRing className="w-4 h-4" /> My Alerts
+                  </Link>
+                  {session && <StudentNotificationBell phone={session.phone} />}
                 </>
               )}
               {isLoggedIn && isOwner && (
@@ -201,7 +235,7 @@ export default function Navbar() {
                   >
                     My Listings
                   </Link>
-                  <NotificationBell />
+                  <OwnerNotificationBell />
                 </>
               )}
               {isLoggedIn && isAdmin && (
@@ -302,13 +336,33 @@ export default function Navbar() {
                       </DropdownMenuItem>
                     )}
                     {isStudent && (
-                      <DropdownMenuItem
-                        onClick={() => router.navigate({ to: "/wishlist" })}
-                        data-ocid="nav.wishlist.menu.item"
-                      >
-                        <Heart className="w-4 h-4 mr-2" />
-                        My Wishlist
-                      </DropdownMenuItem>
+                      <>
+                        <DropdownMenuItem
+                          onClick={() => router.navigate({ to: "/wishlist" })}
+                          data-ocid="nav.wishlist.menu.item"
+                        >
+                          <Heart className="w-4 h-4 mr-2" />
+                          My Wishlist
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            router.navigate({ to: "/student/notifications" })
+                          }
+                          data-ocid="nav.student.notifications.menu.item"
+                        >
+                          <Bell className="w-4 h-4 mr-2" />
+                          Notifications
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            router.navigate({ to: "/student/alerts" })
+                          }
+                          data-ocid="nav.student.alerts.menu.item"
+                        >
+                          <BellRing className="w-4 h-4 mr-2" />
+                          My Alerts
+                        </DropdownMenuItem>
+                      </>
                     )}
                     {isOwner && (
                       <>

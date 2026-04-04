@@ -12,15 +12,20 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { useSearch } from "@tanstack/react-router";
 import { Building2, Search, SlidersHorizontal } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Variant_apartment_sharedRoom_single,
   Variant_boys_unisex_girls,
 } from "../backend";
 import PropertyCard from "../components/PropertyCard";
+import { useAuth } from "../hooks/useAuth";
 import { useApprovedProperties } from "../hooks/useQueries";
+import { getAlerts } from "./StudentAlertsPage";
+import { pushStudentNotif } from "./StudentNotificationsPage";
 
 const FACILITY_OPTIONS = ["WiFi", "Food", "AC", "Parking"];
+
+const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
 
 export default function SearchPage() {
   const searchParams = useSearch({ strict: false }) as Record<string, string>;
@@ -31,7 +36,68 @@ export default function SearchPage() {
   const [maxPrice, setMaxPrice] = useState(50000);
   const [showFilters, setShowFilters] = useState(false);
 
+  const { session } = useAuth();
   const { data: properties, isLoading } = useApprovedProperties();
+  const alertCheckedRef = useRef(false);
+
+  // Alert matching — run once when properties load
+  useEffect(() => {
+    if (!session?.phone || !properties || alertCheckedRef.current) return;
+    alertCheckedRef.current = true;
+
+    const phone = session.phone;
+    const alerts = getAlerts(phone);
+    if (alerts.length === 0) return;
+
+    const now = Date.now();
+    const sentKey = `hidestay_alert_sent_${phone}`;
+    let sentIds: Set<string>;
+    try {
+      const raw = localStorage.getItem(sentKey);
+      sentIds = new Set(raw ? (JSON.parse(raw) as string[]) : []);
+    } catch {
+      sentIds = new Set();
+    }
+
+    for (const prop of properties) {
+      const propMs = Number(prop.availableFrom / 1_000_000n);
+      const isNew = now - propMs <= TWENTY_FOUR_HOURS;
+      if (!isNew) continue;
+
+      const propIdStr = prop.id.toString();
+      if (sentIds.has(propIdStr)) continue;
+
+      for (const alert of alerts) {
+        const matchCity = alert.location
+          ? prop.address.city
+              .toLowerCase()
+              .includes(alert.location.toLowerCase()) ||
+            prop.address.state
+              .toLowerCase()
+              .includes(alert.location.toLowerCase())
+          : true;
+        const matchType =
+          alert.propertyType === "all" || prop.roomType === alert.propertyType;
+        const matchPrice = Number(prop.pricePerMonth) <= alert.maxPrice;
+
+        if (matchCity && matchType && matchPrice) {
+          pushStudentNotif(phone, {
+            type: "property_alert",
+            message: `New property in ${prop.address.city} matches your alert! \"${prop.title}\" - ₹${Number(prop.pricePerMonth).toLocaleString("en-IN")}/month`,
+          });
+          sentIds.add(propIdStr);
+          break; // one notification per property
+        }
+      }
+    }
+
+    // Persist sent IDs
+    try {
+      localStorage.setItem(sentKey, JSON.stringify([...sentIds]));
+    } catch {
+      // ignore
+    }
+  }, [properties, session?.phone]);
 
   function toggleFacility(facility: string) {
     setSelectedFacilities((prev) =>

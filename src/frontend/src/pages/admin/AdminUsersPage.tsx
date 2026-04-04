@@ -9,7 +9,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CheckCircle2, Lock, Unlock, Users, XCircle } from "lucide-react";
+import { useRouter } from "@tanstack/react-router";
+import {
+  CheckCircle2,
+  Lock,
+  ShieldCheck,
+  Unlock,
+  Users,
+  XCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 import { ApprovalStatus } from "../../backend";
 import RouteGuard from "../../components/RouteGuard";
@@ -35,6 +43,7 @@ export default function AdminUsersPage() {
 }
 
 function AdminUsersInner() {
+  const router = useRouter();
   const { data: approvals, isLoading } = useListApprovals();
   const setApproval = useSetApproval();
   const blockUser = useBlockUser();
@@ -73,13 +82,22 @@ function AdminUsersInner() {
 
   return (
     <div className="container max-w-6xl mx-auto px-4 py-10">
-      <div className="mb-8">
-        <h1 className="font-display font-bold text-3xl mb-1">
-          User Management
-        </h1>
-        <p className="text-muted-foreground">
-          Approve, reject, or block property owners requesting access
-        </p>
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="font-display font-bold text-3xl mb-1">
+            User Management
+          </h1>
+          <p className="text-muted-foreground">
+            Approve, reject, or block property owners requesting access
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => router.navigate({ to: "/admin/id-verification" })}
+          data-ocid="admin_users.id_verification.button"
+        >
+          <ShieldCheck className="w-4 h-4 mr-2" /> ID Verification
+        </Button>
       </div>
 
       <div
@@ -180,6 +198,16 @@ function AdminUsersInner() {
                         data-ocid={`admin_users.unblock.button.${i + 1}`}
                       >
                         <Unlock className="w-4 h-4 mr-1" /> Unblock
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          router.navigate({ to: "/admin/id-verification" })
+                        }
+                        data-ocid={`admin_users.view_idv.button.${i + 1}`}
+                      >
+                        <ShieldCheck className="w-4 h-4 mr-1" /> ID Verify
                       </Button>
                     </div>
                   </TableCell>
