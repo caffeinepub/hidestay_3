@@ -14,6 +14,7 @@ import { motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Variant_admin_owner_student } from "../../backend";
+import { useActor } from "../../hooks/useActor";
 import { useAuth } from "../../hooks/useAuth";
 import {
   useApplyReferralCode,
@@ -50,6 +51,7 @@ export default function ProfileSetupPage() {
     "student") as "student" | "owner";
 
   const { setUserSession } = useAuth();
+  const { isFetching: actorLoading } = useActor();
   const saveProfile = useSaveProfile();
   const applyReferralCode = useApplyReferralCode();
   const requestApproval = useRequestApproval();
@@ -128,7 +130,8 @@ export default function ProfileSetupPage() {
     }
   }
 
-  const isPending = saveProfile.isPending || requestApproval.isPending;
+  const isPending =
+    saveProfile.isPending || requestApproval.isPending || actorLoading;
 
   return (
     <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-4 py-16">

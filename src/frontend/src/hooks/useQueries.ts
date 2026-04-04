@@ -17,7 +17,7 @@ import type {
   Variant_bookVisit_contactOwner,
   Variant_rejected_accepted,
 } from "../backend";
-import { useActor } from "./useActor";
+import { useActor, waitForActorReady } from "./useActor";
 
 // Review type (defined locally as it may not be exported from backend.ts)
 export interface Review {
@@ -71,12 +71,12 @@ export function useIsApproved() {
 }
 
 export function useSaveProfile() {
-  const { actor } = useActor();
+  const { getLatestActor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (profile: UserProfile) => {
-      if (!actor) throw new Error("Not connected");
-      await actor.saveCallerUserProfile(profile);
+      const a = await waitForActorReady(getLatestActor);
+      await a.saveCallerUserProfile(profile);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["callerProfile"] });
@@ -86,11 +86,11 @@ export function useSaveProfile() {
 }
 
 export function useRequestApproval() {
-  const { actor } = useActor();
+  const { getLatestActor } = useActor();
   return useMutation({
     mutationFn: async () => {
-      if (!actor) throw new Error("Not connected");
-      await actor.requestApproval();
+      const a = await waitForActorReady(getLatestActor);
+      await a.requestApproval();
     },
   });
 }
@@ -133,12 +133,12 @@ export function useProperty(id: bigint | undefined) {
 }
 
 export function useListProperty() {
-  const { actor } = useActor();
+  const { getLatestActor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (property: Property) => {
-      if (!actor) throw new Error("Not connected");
-      await actor.listProperty(property);
+      const a = await waitForActorReady(getLatestActor);
+      await a.listProperty(property);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["approvedProperties"] });

@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { useEffect } from "react";
 import type { backendInterface } from "../backend";
 import { createActorWithConfig } from "../config";
@@ -52,8 +53,36 @@ export function useActor() {
     }
   }, [actorQuery.data, queryClient]);
 
+  // Returns the latest actor directly from query cache (avoids stale closure)
+  const getLatestActor = useCallback((): backendInterface | null => {
+    return (
+      queryClient.getQueryData<backendInterface>([
+        ACTOR_QUERY_KEY,
+        identity?.getPrincipal().toString(),
+      ]) ?? null
+    );
+  }, [queryClient, identity]);
+
   return {
     actor: actorQuery.data || null,
     isFetching: actorQuery.isFetching,
+    getLatestActor,
   };
+}
+
+/**
+ * Polls the query cache via getLatestActor until an actor is available.
+ * Waits up to maxWaitMs (default 8s) before throwing.
+ */
+export async function waitForActorReady(
+  getLatestActor: () => backendInterface | null,
+  maxWaitMs = 8000,
+): Promise<backendInterface> {
+  const start = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    const a = getLatestActor();
+    if (a) return a;
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  throw new Error("Backend not ready. Please try again.");
 }

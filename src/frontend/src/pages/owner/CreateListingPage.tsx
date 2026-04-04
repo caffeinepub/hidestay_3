@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { ExternalBlob, GenderType, PropertyType } from "../../backend";
 import type { Property } from "../../backend";
 import RouteGuard from "../../components/RouteGuard";
+import { useActor } from "../../hooks/useActor";
 import { useInternetIdentity } from "../../hooks/useInternetIdentity";
 import { useListProperty } from "../../hooks/useQueries";
 
@@ -30,6 +31,7 @@ export default function CreateListingPage() {
 function CreateListingInner() {
   const router = useRouter();
   const { identity } = useInternetIdentity();
+  const { isFetching: actorLoading } = useActor();
   const listProperty = useListProperty();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -426,7 +428,7 @@ function CreateListingInner() {
           type="submit"
           className="w-full"
           size="lg"
-          disabled={listProperty.isPending}
+          disabled={listProperty.isPending || actorLoading}
           data-ocid="create_listing.submit.button"
         >
           {listProperty.isPending ? (
