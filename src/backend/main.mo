@@ -560,9 +560,6 @@ actor {
 
   // Profiles
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can view profiles");
-    };
     profileList.get(caller);
   };
 
@@ -577,9 +574,6 @@ actor {
   };
 
   public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can save profiles");
-    };
     profileList.add(caller, profile);
 
     // NEW: Generate referral code when user saves profile (if not already generated)
@@ -599,9 +593,6 @@ actor {
 
   // Approvals
   public query ({ caller }) func isCallerApproved() : async Bool {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can check approval status");
-    };
     AccessControl.hasPermission(accessControlState, caller, #admin) or UserApproval.isApproved(approvalState, caller);
   };
 
@@ -611,9 +602,6 @@ actor {
   };
 
   public shared ({ caller }) func requestApproval() : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can request approval");
-    };
     UserApproval.requestApproval(approvalState, caller);
   };
 
