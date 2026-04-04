@@ -1,5 +1,6 @@
+import type { Identity } from "@icp-sdk/core/agent";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect } from "react";
 import type { backendInterface } from "../backend";
 import { createActorWithConfig } from "../config";
 import { getSecretParameter } from "../utils/urlParams";
@@ -7,68 +8,56 @@ import { useInternetIdentity } from "./useInternetIdentity";
 
 const ACTOR_QUERY_KEY = "actor";
 
-// Exported helper: waits up to 10s for actor to be ready, then returns it
+// Internal helper to build an actor for a given identity
+async function buildActor(
+  identity: Identity | undefined,
+): Promise<backendInterface> {
+  if (!identity) {
+    return await createActorWithConfig();
+  }
+  const actorOptions = {
+    agentOptions: {
+      identity,
+    },
+  };
+  const actor = await createActorWithConfig(actorOptions);
+  const adminToken = getSecretParameter("caffeineAdminToken") || "";
+  await actor._initializeAccessControlWithSecret(adminToken);
+  return actor;
+}
+
+/**
+ * Waits up to `timeoutMs` for the actor to become available.
+ * Pass the `getLatestActor` function returned by useActor.
+ */
 export async function waitForActorReady(
-  getActor: () => backendInterface | null,
-  maxWaitMs = 10000,
+  getLatest: () => backendInterface | null,
+  timeoutMs = 8000,
 ): Promise<backendInterface> {
   const start = Date.now();
-  return new Promise((resolve, reject) => {
-    function check() {
-      const actor = getActor();
-      if (actor) {
-        resolve(actor);
-        return;
-      }
-      if (Date.now() - start > maxWaitMs) {
-        reject(new Error("Actor not ready. Please refresh and try again."));
-        return;
-      }
-      setTimeout(check, 200);
-    }
-    check();
-  });
+  while (Date.now() - start < timeoutMs) {
+    const a = getLatest();
+    if (a) return a;
+    await new Promise((res) => setTimeout(res, 100));
+  }
+  // One final attempt
+  const a = getLatest();
+  if (a) return a;
+  throw new Error("Actor not ready. Please try again.");
 }
 
 export function useActor() {
   const { identity } = useInternetIdentity();
   const queryClient = useQueryClient();
 
-  // Keep a ref to the latest actor so getLatestActor always returns current value
-  const actorRef = useRef<backendInterface | null>(null);
-
   const actorQuery = useQuery<backendInterface>({
     queryKey: [ACTOR_QUERY_KEY, identity?.getPrincipal().toString()],
     queryFn: async () => {
-      const isAuthenticated = !!identity;
-
-      if (!isAuthenticated) {
-        // Return anonymous actor if not authenticated
-        return await createActorWithConfig();
-      }
-
-      const actorOptions = {
-        agentOptions: {
-          identity,
-        },
-      };
-
-      const actor = await createActorWithConfig(actorOptions);
-      const adminToken = getSecretParameter("caffeineAdminToken") || "";
-      await actor._initializeAccessControlWithSecret(adminToken);
-      return actor;
+      return await buildActor(identity || undefined);
     },
-    // Only refetch when identity changes
     staleTime: Number.POSITIVE_INFINITY,
     enabled: true,
   });
-
-  // Keep the ref in sync with the latest actor data
-  useEffect(() => {
-    if (actorQuery.data) {
-      actorRef.current = actorQuery.data;
-    }
-  }, [actorQuery.data]);
 
   // When the actor changes, invalidate dependent queries
   useEffect(() => {
@@ -86,10 +75,14 @@ export function useActor() {
     }
   }, [actorQuery.data, queryClient]);
 
-  // Stable callback that always returns the latest actor from the ref
-  const getLatestActor = useCallback(() => {
-    return actorRef.current;
-  }, []);
+  // getLatestActor: always returns the currently cached actor
+  const getLatestActor = useCallback((): backendInterface | null => {
+    const cached = queryClient.getQueryData<backendInterface>([
+      ACTOR_QUERY_KEY,
+      identity?.getPrincipal().toString(),
+    ]);
+    return cached || actorQuery.data || null;
+  }, [queryClient, identity, actorQuery.data]);
 
   return {
     actor: actorQuery.data || null,
