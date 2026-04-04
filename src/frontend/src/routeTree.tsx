@@ -4,6 +4,7 @@ import {
   createRoute,
   type createRouter,
 } from "@tanstack/react-router";
+import BottomNav from "./components/BottomNav";
 import Footer from "./components/Footer";
 import Navbar from "./components/Navbar";
 import BookingPage from "./pages/BookingPage";
@@ -15,6 +16,7 @@ import PropertyDetailPage from "./pages/PropertyDetailPage";
 import SearchPage from "./pages/SearchPage";
 import StudentAlertsPage from "./pages/StudentAlertsPage";
 import StudentNotificationsPage from "./pages/StudentNotificationsPage";
+import StudentProfilePage from "./pages/StudentProfilePage";
 import WishlistPage from "./pages/WishlistPage";
 import AdminAnalyticsPage from "./pages/admin/AdminAnalyticsPage";
 import AdminAnnouncementsPage from "./pages/admin/AdminAnnouncementsPage";
@@ -47,9 +49,10 @@ const rootRoute = createRootRoute({
   component: () => (
     <div className="min-h-screen flex flex-col bg-background">
       <Navbar />
-      <main className="flex-1">
+      <main className="flex-1 pb-20 md:pb-0">
         <Outlet />
       </main>
+      <BottomNav />
       <Footer />
     </div>
   ),
@@ -102,6 +105,12 @@ const studentAlertsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/student/alerts",
   component: StudentAlertsPage,
+});
+
+const studentProfileRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/student/profile",
+  component: StudentProfilePage,
 });
 
 // Auth routes
@@ -291,6 +300,7 @@ export const routeTree = rootRoute.addChildren([
   // Student
   studentNotificationsRoute,
   studentAlertsRoute,
+  studentProfileRoute,
   // Auth
   authRoleRoute,
   authPhoneRoute,

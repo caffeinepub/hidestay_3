@@ -18,12 +18,15 @@ import {
   Home,
   LogOut,
   Megaphone,
+  Moon,
   Shield,
+  Sun,
   User,
   X,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
+import { useDarkMode } from "../hooks/useDarkMode";
 import {
   useGetActiveAnnouncements,
   useUnreadNotificationCount,
@@ -138,6 +141,7 @@ function StudentNotificationBell({ phone }: { phone: string }) {
 
 export default function Navbar() {
   const { session, adminSession, logout, adminLogout, currentRole } = useAuth();
+  const { isDark, toggleDark } = useDarkMode();
   const router = useRouter();
 
   const isLoggedIn = !!session || !!adminSession;
@@ -250,7 +254,26 @@ export default function Navbar() {
             </nav>
 
             {/* Right side */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              {/* Dark mode toggle — student and owner only */}
+              {isLoggedIn && (isStudent || isOwner) && (
+                <button
+                  type="button"
+                  className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  onClick={toggleDark}
+                  aria-label={
+                    isDark ? "Switch to light mode" : "Switch to dark mode"
+                  }
+                  data-ocid="nav.dark_mode.toggle"
+                >
+                  {isDark ? (
+                    <Sun className="w-5 h-5" />
+                  ) : (
+                    <Moon className="w-5 h-5" />
+                  )}
+                </button>
+              )}
+
               {!isLoggedIn ? (
                 <>
                   <Button
@@ -318,7 +341,19 @@ export default function Navbar() {
                       )}
                     </div>
 
-                    {!isAdmin && (
+                    {isStudent && (
+                      <DropdownMenuItem
+                        onClick={() =>
+                          router.navigate({ to: "/student/profile" })
+                        }
+                        data-ocid="nav.student.profile.button"
+                      >
+                        <User className="w-4 h-4 mr-2" />
+                        My Profile
+                      </DropdownMenuItem>
+                    )}
+
+                    {!isAdmin && !isStudent && (
                       <DropdownMenuItem
                         onClick={() =>
                           router.navigate({
