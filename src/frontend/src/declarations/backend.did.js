@@ -79,6 +79,11 @@ export const Inquiry = IDL.Record({
   'message' : IDL.Text,
   'timestamp' : Time,
 });
+export const GenderType = IDL.Variant({
+  'boys' : IDL.Null,
+  'unisex' : IDL.Null,
+  'girls' : IDL.Null,
+});
 export const Address = IDL.Record({
   'blocknumber' : IDL.Text,
   'street' : IDL.Text,
@@ -86,6 +91,11 @@ export const Address = IDL.Record({
   'city' : IDL.Text,
   'state' : IDL.Text,
   'bluenumber' : IDL.Text,
+});
+export const PropertyType = IDL.Variant({
+  'apartment' : IDL.Null,
+  'sharedRoom' : IDL.Null,
+  'single' : IDL.Null,
 });
 export const ExternalBlob = IDL.Vec(IDL.Nat8);
 export const Coordinates = IDL.Record({ 'lat' : IDL.Text, 'lang' : IDL.Text });
@@ -99,18 +109,10 @@ export const Property = IDL.Record({
   'availableFrom' : Time,
   'viewCount' : IDL.Nat,
   'approved' : IDL.Bool,
-  'genderPreference' : IDL.Variant({
-    'boys' : IDL.Null,
-    'unisex' : IDL.Null,
-    'girls' : IDL.Null,
-  }),
+  'genderPreference' : GenderType,
   'address' : Address,
   'pricePerMonth' : IDL.Nat,
-  'roomType' : IDL.Variant({
-    'apartment' : IDL.Null,
-    'sharedRoom' : IDL.Null,
-    'single' : IDL.Null,
-  }),
+  'roomType' : PropertyType,
   'photos' : IDL.Vec(ExternalBlob),
   'coordinates' : Coordinates,
   'contactPhone' : IDL.Text,
@@ -125,6 +127,16 @@ export const UserProfile = IDL.Record({
   'email' : IDL.Text,
   'phone' : IDL.Text,
 });
+export const Coupon = IDL.Record({
+  'id' : IDL.Nat,
+  'useCount' : IDL.Nat,
+  'code' : IDL.Text,
+  'createdAt' : Time,
+  'createdBy' : IDL.Principal,
+  'discountPercent' : IDL.Nat,
+  'isActive' : IDL.Bool,
+  'maxUses' : IDL.Nat,
+});
 export const Notification = IDL.Record({
   'id' : IDL.Nat,
   'ownerPrincipal' : IDL.Principal,
@@ -132,6 +144,18 @@ export const Notification = IDL.Record({
   'isRead' : IDL.Bool,
   'message' : IDL.Text,
   'timestamp' : Time,
+});
+export const PayoutRequest = IDL.Record({
+  'id' : IDL.Nat,
+  'status' : IDL.Variant({
+    'pending' : IDL.Null,
+    'approved' : IDL.Null,
+    'rejected' : IDL.Null,
+  }),
+  'notes' : IDL.Opt(IDL.Text),
+  'timestamp' : Time,
+  'student' : IDL.Principal,
+  'pointsRequested' : IDL.Nat,
 });
 export const Report = IDL.Record({
   'id' : IDL.Nat,
@@ -223,19 +247,24 @@ export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
   'addReview' : IDL.Func([IDL.Nat, IDL.Nat, IDL.Text], [], []),
   'addToWishlist' : IDL.Func([IDL.Nat], [], []),
+  'applyReferralCode' : IDL.Func([IDL.Text], [], []),
+  'approvePayoutRequest' : IDL.Func([IDL.Nat], [], []),
   'approveProperty' : IDL.Func([IDL.Nat], [], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+  'awardFirstBookingPoints' : IDL.Func([IDL.Principal], [], []),
   'blockUser' : IDL.Func([IDL.Principal], [], []),
   'bookProperty' : IDL.Func([Booking], [], []),
   'cancelBooking' : IDL.Func([IDL.Nat], [], []),
+  'cancelPaidBooking' : IDL.Func([IDL.Nat], [], []),
   'confirmBooking' : IDL.Func([IDL.Nat], [], []),
-  'rejectBooking' : IDL.Func([IDL.Nat], [], []),
+  'confirmStripeBooking' : IDL.Func([IDL.Nat, IDL.Text], [], []),
   'createAnnouncement' : IDL.Func([IDL.Text, IDL.Text, IDL.Opt(Time)], [], []),
   'createCheckoutSession' : IDL.Func(
       [IDL.Vec(ShoppingItem), IDL.Text, IDL.Text],
       [IDL.Text],
       [],
     ),
+  'createCoupon' : IDL.Func([IDL.Text, IDL.Nat], [IDL.Nat], []),
   'createInquiry' : IDL.Func(
       [
         IDL.Nat,
@@ -248,6 +277,7 @@ export const idlService = IDL.Service({
       [],
     ),
   'deactivateAnnouncement' : IDL.Func([IDL.Nat], [], []),
+  'deactivateCoupon' : IDL.Func([IDL.Text], [], []),
   'deleteProperty' : IDL.Func([IDL.Nat], [], []),
   'deleteReview' : IDL.Func([IDL.Nat, IDL.Principal], [], []),
   'dismissReport' : IDL.Func([IDL.Nat], [], []),
@@ -272,6 +302,7 @@ export const idlService = IDL.Service({
   'getBookings' : IDL.Func([], [IDL.Vec(Booking)], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+  'getCoupons' : IDL.Func([], [IDL.Vec(Coupon)], ['query']),
   'getDailyActiveUserCounts' : IDL.Func(
       [],
       [IDL.Vec(IDL.Record({ 'date' : IDL.Text, 'count' : IDL.Nat }))],
@@ -279,15 +310,18 @@ export const idlService = IDL.Service({
     ),
   'getOwnerInquiries' : IDL.Func([], [IDL.Vec(Inquiry)], ['query']),
   'getOwnerNotifications' : IDL.Func([], [IDL.Vec(Notification)], ['query']),
+  'getPayoutRequests' : IDL.Func([], [IDL.Vec(PayoutRequest)], ['query']),
   'getProperties' : IDL.Func([], [IDL.Vec(Property)], ['query']),
   'getProperty' : IDL.Func([IDL.Nat], [IDL.Opt(Property)], ['query']),
   'getPropertyBookings' : IDL.Func([IDL.Nat], [IDL.Vec(Booking)], ['query']),
+  'getReferralCode' : IDL.Func([], [IDL.Text], ['query']),
   'getReports' : IDL.Func([], [IDL.Vec(Report)], ['query']),
   'getReviews' : IDL.Func([IDL.Nat], [IDL.Vec(Review)], ['query']),
   'getStripePayments' : IDL.Func([], [IDL.Text], []),
   'getStripeSessionStatus' : IDL.Func([IDL.Text], [StripeSessionStatus], []),
   'getUnreadNotificationCount' : IDL.Func([], [IDL.Nat], ['query']),
   'getUserBookings' : IDL.Func([IDL.Principal], [IDL.Vec(Booking)], ['query']),
+  'getUserPoints' : IDL.Func([], [IDL.Nat], ['query']),
   'getUserProfile' : IDL.Func(
       [IDL.Principal],
       [IDL.Opt(UserProfile)],
@@ -302,8 +336,11 @@ export const idlService = IDL.Service({
   'listProperty' : IDL.Func([Property], [], []),
   'markAllNotificationsRead' : IDL.Func([], [], []),
   'markNotificationRead' : IDL.Func([IDL.Nat], [], []),
+  'rejectBooking' : IDL.Func([IDL.Nat], [], []),
+  'rejectPayoutRequest' : IDL.Func([IDL.Nat], [], []),
   'removeFromWishlist' : IDL.Func([IDL.Nat], [], []),
   'requestApproval' : IDL.Func([], [], []),
+  'requestPayout' : IDL.Func([IDL.Opt(IDL.Text)], [IDL.Nat], []),
   'resolveReport' : IDL.Func([IDL.Nat, IDL.Text], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'setApproval' : IDL.Func([IDL.Principal, ApprovalStatus], [], []),
@@ -323,6 +360,8 @@ export const idlService = IDL.Service({
       [],
     ),
   'updateProperty' : IDL.Func([IDL.Nat, Property], [], []),
+  'useCoupon' : IDL.Func([IDL.Text], [], []),
+  'validateCoupon' : IDL.Func([IDL.Text], [IDL.Opt(Coupon)], ['query']),
   'verifyProperty' : IDL.Func([IDL.Nat], [], []),
 });
 
@@ -400,6 +439,11 @@ export const idlFactory = ({ IDL }) => {
     'message' : IDL.Text,
     'timestamp' : Time,
   });
+  const GenderType = IDL.Variant({
+    'boys' : IDL.Null,
+    'unisex' : IDL.Null,
+    'girls' : IDL.Null,
+  });
   const Address = IDL.Record({
     'blocknumber' : IDL.Text,
     'street' : IDL.Text,
@@ -407,6 +451,11 @@ export const idlFactory = ({ IDL }) => {
     'city' : IDL.Text,
     'state' : IDL.Text,
     'bluenumber' : IDL.Text,
+  });
+  const PropertyType = IDL.Variant({
+    'apartment' : IDL.Null,
+    'sharedRoom' : IDL.Null,
+    'single' : IDL.Null,
   });
   const ExternalBlob = IDL.Vec(IDL.Nat8);
   const Coordinates = IDL.Record({ 'lat' : IDL.Text, 'lang' : IDL.Text });
@@ -420,18 +469,10 @@ export const idlFactory = ({ IDL }) => {
     'availableFrom' : Time,
     'viewCount' : IDL.Nat,
     'approved' : IDL.Bool,
-    'genderPreference' : IDL.Variant({
-      'boys' : IDL.Null,
-      'unisex' : IDL.Null,
-      'girls' : IDL.Null,
-    }),
+    'genderPreference' : GenderType,
     'address' : Address,
     'pricePerMonth' : IDL.Nat,
-    'roomType' : IDL.Variant({
-      'apartment' : IDL.Null,
-      'sharedRoom' : IDL.Null,
-      'single' : IDL.Null,
-    }),
+    'roomType' : PropertyType,
     'photos' : IDL.Vec(ExternalBlob),
     'coordinates' : Coordinates,
     'contactPhone' : IDL.Text,
@@ -446,6 +487,16 @@ export const idlFactory = ({ IDL }) => {
     'email' : IDL.Text,
     'phone' : IDL.Text,
   });
+  const Coupon = IDL.Record({
+    'id' : IDL.Nat,
+    'useCount' : IDL.Nat,
+    'code' : IDL.Text,
+    'createdAt' : Time,
+    'createdBy' : IDL.Principal,
+    'discountPercent' : IDL.Nat,
+    'isActive' : IDL.Bool,
+    'maxUses' : IDL.Nat,
+  });
   const Notification = IDL.Record({
     'id' : IDL.Nat,
     'ownerPrincipal' : IDL.Principal,
@@ -453,6 +504,18 @@ export const idlFactory = ({ IDL }) => {
     'isRead' : IDL.Bool,
     'message' : IDL.Text,
     'timestamp' : Time,
+  });
+  const PayoutRequest = IDL.Record({
+    'id' : IDL.Nat,
+    'status' : IDL.Variant({
+      'pending' : IDL.Null,
+      'approved' : IDL.Null,
+      'rejected' : IDL.Null,
+    }),
+    'notes' : IDL.Opt(IDL.Text),
+    'timestamp' : Time,
+    'student' : IDL.Principal,
+    'pointsRequested' : IDL.Nat,
   });
   const Report = IDL.Record({
     'id' : IDL.Nat,
@@ -541,13 +604,17 @@ export const idlFactory = ({ IDL }) => {
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
     'addReview' : IDL.Func([IDL.Nat, IDL.Nat, IDL.Text], [], []),
     'addToWishlist' : IDL.Func([IDL.Nat], [], []),
+    'applyReferralCode' : IDL.Func([IDL.Text], [], []),
+    'approvePayoutRequest' : IDL.Func([IDL.Nat], [], []),
     'approveProperty' : IDL.Func([IDL.Nat], [], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+    'awardFirstBookingPoints' : IDL.Func([IDL.Principal], [], []),
     'blockUser' : IDL.Func([IDL.Principal], [], []),
     'bookProperty' : IDL.Func([Booking], [], []),
-  'cancelBooking' : IDL.Func([IDL.Nat], [], []),
-  'confirmBooking' : IDL.Func([IDL.Nat], [], []),
-  'rejectBooking' : IDL.Func([IDL.Nat], [], []),
+    'cancelBooking' : IDL.Func([IDL.Nat], [], []),
+    'cancelPaidBooking' : IDL.Func([IDL.Nat], [], []),
+    'confirmBooking' : IDL.Func([IDL.Nat], [], []),
+    'confirmStripeBooking' : IDL.Func([IDL.Nat, IDL.Text], [], []),
     'createAnnouncement' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Opt(Time)],
         [],
@@ -558,6 +625,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Text],
         [],
       ),
+    'createCoupon' : IDL.Func([IDL.Text, IDL.Nat], [IDL.Nat], []),
     'createInquiry' : IDL.Func(
         [
           IDL.Nat,
@@ -570,6 +638,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'deactivateAnnouncement' : IDL.Func([IDL.Nat], [], []),
+    'deactivateCoupon' : IDL.Func([IDL.Text], [], []),
     'deleteProperty' : IDL.Func([IDL.Nat], [], []),
     'deleteReview' : IDL.Func([IDL.Nat, IDL.Principal], [], []),
     'dismissReport' : IDL.Func([IDL.Nat], [], []),
@@ -594,6 +663,7 @@ export const idlFactory = ({ IDL }) => {
     'getBookings' : IDL.Func([], [IDL.Vec(Booking)], ['query']),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+    'getCoupons' : IDL.Func([], [IDL.Vec(Coupon)], ['query']),
     'getDailyActiveUserCounts' : IDL.Func(
         [],
         [IDL.Vec(IDL.Record({ 'date' : IDL.Text, 'count' : IDL.Nat }))],
@@ -601,9 +671,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getOwnerInquiries' : IDL.Func([], [IDL.Vec(Inquiry)], ['query']),
     'getOwnerNotifications' : IDL.Func([], [IDL.Vec(Notification)], ['query']),
+    'getPayoutRequests' : IDL.Func([], [IDL.Vec(PayoutRequest)], ['query']),
     'getProperties' : IDL.Func([], [IDL.Vec(Property)], ['query']),
     'getProperty' : IDL.Func([IDL.Nat], [IDL.Opt(Property)], ['query']),
     'getPropertyBookings' : IDL.Func([IDL.Nat], [IDL.Vec(Booking)], ['query']),
+    'getReferralCode' : IDL.Func([], [IDL.Text], ['query']),
     'getReports' : IDL.Func([], [IDL.Vec(Report)], ['query']),
     'getReviews' : IDL.Func([IDL.Nat], [IDL.Vec(Review)], ['query']),
     'getStripePayments' : IDL.Func([], [IDL.Text], []),
@@ -614,6 +686,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(Booking)],
         ['query'],
       ),
+    'getUserPoints' : IDL.Func([], [IDL.Nat], ['query']),
     'getUserProfile' : IDL.Func(
         [IDL.Principal],
         [IDL.Opt(UserProfile)],
@@ -628,8 +701,11 @@ export const idlFactory = ({ IDL }) => {
     'listProperty' : IDL.Func([Property], [], []),
     'markAllNotificationsRead' : IDL.Func([], [], []),
     'markNotificationRead' : IDL.Func([IDL.Nat], [], []),
+    'rejectBooking' : IDL.Func([IDL.Nat], [], []),
+    'rejectPayoutRequest' : IDL.Func([IDL.Nat], [], []),
     'removeFromWishlist' : IDL.Func([IDL.Nat], [], []),
     'requestApproval' : IDL.Func([], [], []),
+    'requestPayout' : IDL.Func([IDL.Opt(IDL.Text)], [IDL.Nat], []),
     'resolveReport' : IDL.Func([IDL.Nat, IDL.Text], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'setApproval' : IDL.Func([IDL.Principal, ApprovalStatus], [], []),
@@ -652,6 +728,8 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'updateProperty' : IDL.Func([IDL.Nat, Property], [], []),
+    'useCoupon' : IDL.Func([IDL.Text], [], []),
+    'validateCoupon' : IDL.Func([IDL.Text], [IDL.Opt(Coupon)], ['query']),
     'verifyProperty' : IDL.Func([IDL.Nat], [], []),
   });
 };

@@ -43,10 +43,10 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
+  GenderType,
+  PropertyType,
   Variant_admin_owner_student,
-  Variant_apartment_sharedRoom_single,
   Variant_bookVisit_contactOwner,
-  Variant_boys_unisex_girls,
 } from "../backend";
 import { useAuth } from "../hooks/useAuth";
 import {
@@ -60,16 +60,16 @@ import {
 } from "../hooks/useQueries";
 import { useWishlist } from "../hooks/useWishlist";
 
-const roomTypeLabels: Record<Variant_apartment_sharedRoom_single, string> = {
-  [Variant_apartment_sharedRoom_single.apartment]: "PG / Flat",
-  [Variant_apartment_sharedRoom_single.sharedRoom]: "Shared Room",
-  [Variant_apartment_sharedRoom_single.single]: "Private Room",
+const roomTypeLabels: Record<PropertyType, string> = {
+  [PropertyType.apartment]: "PG / Flat",
+  [PropertyType.sharedRoom]: "Shared Room",
+  [PropertyType.single]: "Private Room",
 };
 
-const genderLabels: Record<Variant_boys_unisex_girls, string> = {
-  [Variant_boys_unisex_girls.boys]: "Boys Only",
-  [Variant_boys_unisex_girls.girls]: "Girls Only",
-  [Variant_boys_unisex_girls.unisex]: "Unisex",
+const genderLabels: Record<GenderType, string> = {
+  [GenderType.boys]: "Boys Only",
+  [GenderType.girls]: "Girls Only",
+  [GenderType.unisex]: "Unisex",
 };
 
 const reportReasons = [

@@ -45,7 +45,20 @@ export interface Booking {
   'startDate' : Time,
 }
 export interface Coordinates { 'lat' : string, 'lang' : string }
+export interface Coupon {
+  'id' : bigint,
+  'useCount' : bigint,
+  'code' : string,
+  'createdAt' : Time,
+  'createdBy' : Principal,
+  'discountPercent' : bigint,
+  'isActive' : boolean,
+  'maxUses' : bigint,
+}
 export type ExternalBlob = Uint8Array;
+export type GenderType = { 'boys' : null } |
+  { 'unisex' : null } |
+  { 'girls' : null };
 export interface Inquiry {
   'id' : bigint,
   'status' : { 'pending' : null } |
@@ -68,6 +81,16 @@ export interface Notification {
   'message' : string,
   'timestamp' : Time,
 }
+export interface PayoutRequest {
+  'id' : bigint,
+  'status' : { 'pending' : null } |
+    { 'approved' : null } |
+    { 'rejected' : null },
+  'notes' : [] | [string],
+  'timestamp' : Time,
+  'student' : Principal,
+  'pointsRequested' : bigint,
+}
 export interface Property {
   'id' : bigint,
   'title' : string,
@@ -78,18 +101,17 @@ export interface Property {
   'availableFrom' : Time,
   'viewCount' : bigint,
   'approved' : boolean,
-  'genderPreference' : { 'boys' : null } |
-    { 'unisex' : null } |
-    { 'girls' : null },
+  'genderPreference' : GenderType,
   'address' : Address,
   'pricePerMonth' : bigint,
-  'roomType' : { 'apartment' : null } |
-    { 'sharedRoom' : null } |
-    { 'single' : null },
+  'roomType' : PropertyType,
   'photos' : Array<ExternalBlob>,
   'coordinates' : Coordinates,
   'contactPhone' : string,
 }
+export type PropertyType = { 'apartment' : null } |
+  { 'sharedRoom' : null } |
+  { 'single' : null };
 export interface Report {
   'id' : bigint,
   'status' : { 'resolved' : null } |
@@ -185,18 +207,23 @@ export interface _SERVICE {
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
   'addReview' : ActorMethod<[bigint, bigint, string], undefined>,
   'addToWishlist' : ActorMethod<[bigint], undefined>,
+  'applyReferralCode' : ActorMethod<[string], undefined>,
+  'approvePayoutRequest' : ActorMethod<[bigint], undefined>,
   'approveProperty' : ActorMethod<[bigint], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'awardFirstBookingPoints' : ActorMethod<[Principal], undefined>,
   'blockUser' : ActorMethod<[Principal], undefined>,
   'bookProperty' : ActorMethod<[Booking], undefined>,
   'cancelBooking' : ActorMethod<[bigint], undefined>,
+  'cancelPaidBooking' : ActorMethod<[bigint], undefined>,
   'confirmBooking' : ActorMethod<[bigint], undefined>,
-  'rejectBooking' : ActorMethod<[bigint], undefined>,
+  'confirmStripeBooking' : ActorMethod<[bigint, string], undefined>,
   'createAnnouncement' : ActorMethod<[string, string, [] | [Time]], undefined>,
   'createCheckoutSession' : ActorMethod<
     [Array<ShoppingItem>, string, string],
     string
   >,
+  'createCoupon' : ActorMethod<[string, bigint], bigint>,
   'createInquiry' : ActorMethod<
     [
       bigint,
@@ -209,6 +236,7 @@ export interface _SERVICE {
     undefined
   >,
   'deactivateAnnouncement' : ActorMethod<[bigint], undefined>,
+  'deactivateCoupon' : ActorMethod<[string], undefined>,
   'deleteProperty' : ActorMethod<[bigint], undefined>,
   'deleteReview' : ActorMethod<[bigint, Principal], undefined>,
   'dismissReport' : ActorMethod<[bigint], undefined>,
@@ -230,21 +258,25 @@ export interface _SERVICE {
   'getBookings' : ActorMethod<[], Array<Booking>>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
+  'getCoupons' : ActorMethod<[], Array<Coupon>>,
   'getDailyActiveUserCounts' : ActorMethod<
     [],
     Array<{ 'date' : string, 'count' : bigint }>
   >,
   'getOwnerInquiries' : ActorMethod<[], Array<Inquiry>>,
   'getOwnerNotifications' : ActorMethod<[], Array<Notification>>,
+  'getPayoutRequests' : ActorMethod<[], Array<PayoutRequest>>,
   'getProperties' : ActorMethod<[], Array<Property>>,
   'getProperty' : ActorMethod<[bigint], [] | [Property]>,
   'getPropertyBookings' : ActorMethod<[bigint], Array<Booking>>,
+  'getReferralCode' : ActorMethod<[], string>,
   'getReports' : ActorMethod<[], Array<Report>>,
   'getReviews' : ActorMethod<[bigint], Array<Review>>,
   'getStripePayments' : ActorMethod<[], string>,
   'getStripeSessionStatus' : ActorMethod<[string], StripeSessionStatus>,
   'getUnreadNotificationCount' : ActorMethod<[], bigint>,
   'getUserBookings' : ActorMethod<[Principal], Array<Booking>>,
+  'getUserPoints' : ActorMethod<[], bigint>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'getWishlist' : ActorMethod<[], Array<bigint>>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
@@ -255,8 +287,11 @@ export interface _SERVICE {
   'listProperty' : ActorMethod<[Property], undefined>,
   'markAllNotificationsRead' : ActorMethod<[], undefined>,
   'markNotificationRead' : ActorMethod<[bigint], undefined>,
+  'rejectBooking' : ActorMethod<[bigint], undefined>,
+  'rejectPayoutRequest' : ActorMethod<[bigint], undefined>,
   'removeFromWishlist' : ActorMethod<[bigint], undefined>,
   'requestApproval' : ActorMethod<[], undefined>,
+  'requestPayout' : ActorMethod<[[] | [string]], bigint>,
   'resolveReport' : ActorMethod<[bigint, string], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'setApproval' : ActorMethod<[Principal, ApprovalStatus], undefined>,
@@ -271,6 +306,8 @@ export interface _SERVICE {
     undefined
   >,
   'updateProperty' : ActorMethod<[bigint, Property], undefined>,
+  'useCoupon' : ActorMethod<[string], undefined>,
+  'validateCoupon' : ActorMethod<[string], [] | [Coupon]>,
   'verifyProperty' : ActorMethod<[bigint], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;

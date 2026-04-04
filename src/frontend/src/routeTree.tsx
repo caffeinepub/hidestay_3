@@ -17,10 +17,13 @@ import SearchPage from "./pages/SearchPage";
 import StudentAlertsPage from "./pages/StudentAlertsPage";
 import StudentNotificationsPage from "./pages/StudentNotificationsPage";
 import StudentProfilePage from "./pages/StudentProfilePage";
+import StudentReferralPage from "./pages/StudentReferralPage";
+import StudentRewardsPage from "./pages/StudentRewardsPage";
 import WishlistPage from "./pages/WishlistPage";
 import AdminAnalyticsPage from "./pages/admin/AdminAnalyticsPage";
 import AdminAnnouncementsPage from "./pages/admin/AdminAnnouncementsPage";
 import AdminBookingsPage from "./pages/admin/AdminBookingsPage";
+import AdminCouponsPage from "./pages/admin/AdminCouponsPage";
 import AdminCreatePage from "./pages/admin/AdminCreatePage";
 import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
 import AdminForgotPasswordPage from "./pages/admin/AdminForgotPasswordPage";
@@ -28,6 +31,7 @@ import AdminIdVerificationPage from "./pages/admin/AdminIdVerificationPage";
 import AdminListingsPage from "./pages/admin/AdminListingsPage";
 import AdminLoginPage from "./pages/admin/AdminLoginPage";
 import AdminPaymentsPage from "./pages/admin/AdminPaymentsPage";
+import AdminPayoutsPage from "./pages/admin/AdminPayoutsPage";
 import AdminReportsPage from "./pages/admin/AdminReportsPage";
 import AdminResetPasswordPage from "./pages/admin/AdminResetPasswordPage";
 import AdminReviewsPage from "./pages/admin/AdminReviewsPage";
@@ -111,6 +115,18 @@ const studentProfileRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/student/profile",
   component: StudentProfilePage,
+});
+
+const studentReferralRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/student/referral",
+  component: StudentReferralPage,
+});
+
+const studentRewardsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/student/rewards",
+  component: StudentRewardsPage,
 });
 
 // Auth routes
@@ -290,6 +306,18 @@ const adminIdVerificationRoute = createRoute({
   component: AdminIdVerificationPage,
 });
 
+const adminCouponsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin/coupons",
+  component: AdminCouponsPage,
+});
+
+const adminPayoutsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin/payouts",
+  component: AdminPayoutsPage,
+});
+
 export const routeTree = rootRoute.addChildren([
   indexRoute,
   searchRoute,
@@ -301,6 +329,8 @@ export const routeTree = rootRoute.addChildren([
   studentNotificationsRoute,
   studentAlertsRoute,
   studentProfileRoute,
+  studentReferralRoute,
+  studentRewardsRoute,
   // Auth
   authRoleRoute,
   authPhoneRoute,
@@ -334,6 +364,8 @@ export const routeTree = rootRoute.addChildren([
   adminAnalyticsRoute,
   adminAnnouncementsRoute,
   adminIdVerificationRoute,
+  adminCouponsRoute,
+  adminPayoutsRoute,
 ]);
 
 declare module "@tanstack/react-router" {

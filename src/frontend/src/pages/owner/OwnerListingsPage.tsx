@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Variant_apartment_sharedRoom_single } from "../../backend";
+import { PropertyType } from "../../backend";
 import RouteGuard from "../../components/RouteGuard";
 import { useInternetIdentity } from "../../hooks/useInternetIdentity";
 import {
@@ -41,10 +41,10 @@ import {
   useUpdateProperty,
 } from "../../hooks/useQueries";
 
-const roomTypeLabels: Record<Variant_apartment_sharedRoom_single, string> = {
-  [Variant_apartment_sharedRoom_single.apartment]: "Apartment",
-  [Variant_apartment_sharedRoom_single.sharedRoom]: "Shared Room",
-  [Variant_apartment_sharedRoom_single.single]: "Single Room",
+const roomTypeLabels: Record<PropertyType, string> = {
+  [PropertyType.apartment]: "Apartment",
+  [PropertyType.sharedRoom]: "Shared Room",
+  [PropertyType.single]: "Single Room",
 };
 
 export default function OwnerListingsPage() {

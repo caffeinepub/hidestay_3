@@ -1,49 +1,51 @@
-# Hidestay — Phase 1: UI Polish, Student Profile Page, Bottom Nav & Dark Mode
+# Hidestay
 
 ## Current State
-- Full-stack student rental marketplace with student/owner/admin role flows
-- Students can search, book (visit/paid), wishlist, view notifications, subscribe to alerts, submit reviews/reports
-- Owner dashboard with listings, leads, bookings overview, notifications, ID verification
-- Super Admin panel with analytics, payments, reports, announcements, user/listing management
-- Auth: simulated mobile OTP for students/owners, email+password+2FA for admins
-- Navbar: desktop nav with role-based links; no bottom navigation for mobile
-- No dedicated student profile page (bookings/wishlist/alerts scattered across separate pages)
-- No dark mode toggle
-- No referral/coupon/points system yet
-- main.tsx wraps app in QueryClientProvider + InternetIdentityProvider but MISSING AuthProvider
+Phase 1 (UI/UX Polish) is live: Student profile page with 5 tabs (Overview, My Bookings, Wishlist, Alerts, Settings), bottom navigation for students, dark mode toggle for students and owners, AuthProvider permanently in main.tsx. All previous features are live: Stripe paid booking, free visit booking, notifications, reviews, trust/ID verification, admin panel.
+
+Backend already has: property CRUD, bookings (pending/paid/cancelled/rejected), Stripe checkout/refund, notifications, wishlist, reviews, reports, announcements, analytics, user profiles.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Student Profile Page (`/student/profile`) — tabs: Overview, My Bookings, Wishlist, My Alerts, Settings
-  - Overview: name, phone, edit profile, account info
-  - My Bookings: list of all bookings with status badges and cancel actions
-  - Wishlist: saved properties grid
-  - My Alerts: saved search subscriptions
-  - Settings: dark mode toggle, notification toggle, logout
-- Bottom Navigation Bar (mobile only, students only) — 4 tabs: Home, Search, Wishlist, Profile
-- Dark mode: toggle stored in localStorage, applies `dark` class to `<html>`, works for both students and owners
-- Skeleton loaders on LandingPage, SearchPage, WishlistPage while data loads
-- Dark mode context/hook: `useDarkMode` — wraps localStorage read/write and applies class to document root
-- AuthProvider added to main.tsx (permanent fix)
+- **Referral System (backend):** Each user gets a unique referral code stored in their profile. New users can enter a referral code during signup. Referrer earns 10 points per successful referral. New user gets a 10% discount coupon on first paid booking.
+- **Points/Rewards System (backend):** Points per user stored in backend. Earn 10 points for first booking, 10 points per referral. When points balance reaches 800+ (₹800 threshold), student can request payout. Admin can approve/reject payout requests.
+- **Coupon System (backend):** Admin creates promo codes with 10% discount. Coupons are applied to paid Stripe bookings. One coupon per booking. Coupon can be single-use or multi-use. Backend validates and marks coupon as used.
+- **Referral Page** (`/student/referral`): Shows user's unique referral code, copy button, referral count, cashback earned. Link from student profile Settings tab.
+- **Rewards Page** (`/student/rewards`): Shows points balance, payout request button (active at ₹800+), payout history. Link from student profile.
+- **Coupon Apply UI**: Input field in BookingPage for paid bookings to apply a coupon code. Shows discount and final price.
+- **Admin Coupon Management** (`/admin/coupons`): Admin can create, view, and deactivate coupons/promo codes.
+- **Admin Payout Management** (`/admin/payouts`): Admin can approve or reject student payout requests.
+- **Profile referral code input**: During signup (ProfileSetupPage), add optional "Referral code" field.
 
 ### Modify
-- `main.tsx`: wrap app in `<AuthProvider>` (permanent fix between QueryClientProvider and InternetIdentityProvider)
-- `Navbar.tsx`: add link to `/student/profile` for students; add dark mode toggle button for student/owner roles; hide desktop nav links that are now in Profile tabs (keep Browse Properties)
-- `routeTree.tsx`: add `/student/profile` route
-- `index.css`: ensure `.dark` class variables are present (already exists, verify)
-- `WishlistPage.tsx`: add Skeleton loading states
-- `SearchPage.tsx`: add Skeleton loading states
+- `main.mo`: Add referral code, points, coupon, and payout types and logic.
+- `BookingPage.tsx`: Add coupon code input for paid bookings, show discount, update Stripe session price.
+- `StudentProfilePage.tsx`: Add Referral and Rewards links/cards in Overview tab.
+- `ProfileSetupPage.tsx`: Add optional referral code input field.
+- `routeTree.tsx`: Add routes for `/student/referral`, `/student/rewards`, `/admin/coupons`, `/admin/payouts`.
+- `AdminDashboardPage.tsx`: Add quick links to Coupons and Payouts pages.
+- `Navbar.tsx`: No changes needed.
 
 ### Remove
-- Nothing removed; links are consolidated into Profile page, original routes remain accessible
+- Nothing removed.
 
 ## Implementation Plan
-1. Add `AuthProvider` to `main.tsx` — wrap between QueryClientProvider and InternetIdentityProvider
-2. Create `useDarkMode` hook — reads/writes `hidestay_dark_mode` localStorage key, applies `.dark` class to `document.documentElement`
-3. Create `StudentProfilePage` (`/student/profile`) — tabbed layout with Overview, My Bookings, Wishlist, My Alerts, Settings
-4. Update `routeTree.tsx` — add studentProfileRoute at `/student/profile`
-5. Update `Navbar.tsx` — add Profile link for students, dark mode toggle button (moon/sun icon) for student/owner
-6. Create `BottomNav` component — mobile-only (hidden md:hidden), shown only for students: Home/Search/Wishlist/Profile tabs with active state
-7. Update `routeTree.tsx` root layout — include BottomNav below main content, add `pb-20 md:pb-0` to main to account for bottom nav height on mobile
-8. Add proper Skeleton loaders to LandingPage, SearchPage, WishlistPage
+1. Update `main.mo` to add:
+   - `ReferralCode` type, `referralCodes` map (code → principal), auto-generate code on profile save
+   - `pointsMap` (principal → Nat) for reward points
+   - `PayoutRequest` type and `payoutRequests` map
+   - `Coupon` type and `couponMap` (code → Coupon)
+   - Backend functions: `generateReferralCode`, `applyReferralCode`, `getUserPoints`, `requestPayout`, `getPayoutRequests`, `approvePayoutRequest`, `rejectPayoutRequest`, `createCoupon`, `getCoupons`, `validateCoupon`, `useCoupon`, `deactivateCoupon`
+2. Re-generate backend bindings.
+3. Build frontend:
+   - `StudentReferralPage.tsx` at `/student/referral`
+   - `StudentRewardsPage.tsx` at `/student/rewards`
+   - `AdminCouponsPage.tsx` at `/admin/coupons`
+   - `AdminPayoutsPage.tsx` at `/admin/payouts`
+   - Update `BookingPage.tsx` to add coupon input for paid bookings
+   - Update `StudentProfilePage.tsx` to show referral/rewards cards
+   - Update `ProfileSetupPage.tsx` to add referral code input
+   - Update `routeTree.tsx` with new routes
+   - Update `AdminDashboardPage.tsx` quick links
+4. Validate (typecheck + build) and deploy.

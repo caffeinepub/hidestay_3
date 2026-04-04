@@ -15,7 +15,11 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Variant_admin_owner_student } from "../../backend";
 import { useAuth } from "../../hooks/useAuth";
-import { useRequestApproval, useSaveProfile } from "../../hooks/useQueries";
+import {
+  useApplyReferralCode,
+  useRequestApproval,
+  useSaveProfile,
+} from "../../hooks/useQueries";
 
 type SearchParams = {
   phone?: string;
@@ -47,10 +51,12 @@ export default function ProfileSetupPage() {
 
   const { setUserSession } = useAuth();
   const saveProfile = useSaveProfile();
+  const applyReferralCode = useApplyReferralCode();
   const requestApproval = useRequestApproval();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [referralCode, setReferralCode] = useState("");
 
   // Student-specific
   const [studentExt, setStudentExt] = useState<ExtendedStudentProfile>({
@@ -96,6 +102,17 @@ export default function ProfileSetupPage() {
 
       // Create session
       setUserSession(phone, role);
+
+      // Apply referral code silently if provided (student only)
+      if (role === "student" && referralCode.trim()) {
+        try {
+          await applyReferralCode.mutateAsync(
+            referralCode.trim().toUpperCase(),
+          );
+        } catch {
+          // Ignore referral code errors - don't block profile creation
+        }
+      }
 
       if (role === "owner") {
         toast.success(
@@ -277,6 +294,26 @@ export default function ProfileSetupPage() {
                       </SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="referral-code">
+                    Referral Code (optional)
+                  </Label>
+                  <Input
+                    id="referral-code"
+                    value={referralCode}
+                    onChange={(e) =>
+                      setReferralCode(e.target.value.toUpperCase())
+                    }
+                    placeholder="Enter a friend's referral code"
+                    className="font-mono uppercase"
+                    data-ocid="profile.referral.input"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Get 10% off your first booking when you enter a valid
+                    referral code
+                  </p>
                 </div>
               </>
             )}

@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link } from "@tanstack/react-router";
 import { CheckCircle, MapPin, ShieldCheck, Star } from "lucide-react";
 import type { Property } from "../backend";
-import { Variant_apartment_sharedRoom_single } from "../backend";
+import { PropertyType } from "../backend";
 import { usePropertyReviews } from "../hooks/useQueries";
 
 interface PropertyCardProps {
@@ -11,10 +11,10 @@ interface PropertyCardProps {
   index?: number;
 }
 
-const roomTypeLabels: Record<Variant_apartment_sharedRoom_single, string> = {
-  [Variant_apartment_sharedRoom_single.apartment]: "PG / Flat",
-  [Variant_apartment_sharedRoom_single.sharedRoom]: "Shared Room",
-  [Variant_apartment_sharedRoom_single.single]: "Private Room",
+const roomTypeLabels: Record<PropertyType, string> = {
+  [PropertyType.apartment]: "PG / Flat",
+  [PropertyType.sharedRoom]: "Shared Room",
+  [PropertyType.single]: "Private Room",
 };
 
 export default function PropertyCard({

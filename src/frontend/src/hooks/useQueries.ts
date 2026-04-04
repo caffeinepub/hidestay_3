@@ -831,3 +831,163 @@ export function useGetStripePayments() {
     staleTime: 0,
   });
 }
+
+// === Referral System ===
+export function useGetReferralCode() {
+  const { actor, isFetching } = useActor();
+  return useQuery<string>({
+    queryKey: ["referralCode"],
+    queryFn: async () => {
+      if (!actor) return "";
+      return actor.getReferralCode();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useApplyReferralCode() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (code: string) => {
+      if (!actor) throw new Error("Not connected");
+      await actor.applyReferralCode(code);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["points"] });
+    },
+  });
+}
+
+// === Points / Rewards ===
+export function useGetUserPoints() {
+  const { actor, isFetching } = useActor();
+  return useQuery<bigint>({
+    queryKey: ["points"],
+    queryFn: async () => {
+      if (!actor) return 0n;
+      return actor.getUserPoints();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useRequestPayout() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (notes: string | null) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.requestPayout(notes);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["points"] });
+      qc.invalidateQueries({ queryKey: ["payoutRequests"] });
+    },
+  });
+}
+
+export function useGetPayoutRequests() {
+  const { actor, isFetching } = useActor();
+  return useQuery({
+    queryKey: ["payoutRequests"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getPayoutRequests();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useApprovePayoutRequest() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (requestId: bigint) => {
+      if (!actor) throw new Error("Not connected");
+      await actor.approvePayoutRequest(requestId);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["payoutRequests"] });
+    },
+  });
+}
+
+export function useRejectPayoutRequest() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (requestId: bigint) => {
+      if (!actor) throw new Error("Not connected");
+      await actor.rejectPayoutRequest(requestId);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["payoutRequests"] });
+    },
+  });
+}
+
+// === Coupon System ===
+export function useGetCoupons() {
+  const { actor, isFetching } = useActor();
+  return useQuery({
+    queryKey: ["coupons"],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getCoupons();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useValidateCoupon() {
+  const { actor } = useActor();
+  return useMutation({
+    mutationFn: async (code: string) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.validateCoupon(code);
+    },
+  });
+}
+
+export function useMarkCouponUsed() {
+  const { actor } = useActor();
+  return useMutation({
+    mutationFn: async (code: string) => {
+      if (!actor) throw new Error("Not connected");
+      // biome-ignore lint/complexity/useLiteralKeys: intentional to avoid false hook detection
+      await actor["useCoupon"](code);
+    },
+  });
+}
+
+export function useCreateCoupon() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      code,
+      maxUses,
+    }: { code: string; maxUses: bigint }) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.createCoupon(code, maxUses);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["coupons"] });
+    },
+  });
+}
+
+export function useDeactivateCoupon() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (code: string) => {
+      if (!actor) throw new Error("Not connected");
+      await actor.deactivateCoupon(code);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["coupons"] });
+    },
+  });
+}

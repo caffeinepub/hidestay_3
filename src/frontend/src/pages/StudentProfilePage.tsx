@@ -36,12 +36,14 @@ import {
   Calendar,
   CheckCircle2,
   Edit2,
+  Gift,
   Heart,
   LogOut,
   MapPin,
   Moon,
   RefreshCw,
   Settings,
+  Star,
   Sun,
   Trash2,
   User,
@@ -57,6 +59,7 @@ import {
   useApprovedProperties,
   useCancelBooking,
   useCancelPaidBooking,
+  useGetUserPoints,
   useMyBookings,
 } from "../hooks/useQueries";
 import { useWishlist } from "../hooks/useWishlist";
@@ -101,6 +104,7 @@ function StudentProfileInner() {
     useMyBookings(principal);
   const cancelMutation = useCancelBooking();
   const cancelPaidMutation = useCancelPaidBooking();
+  const { data: points } = useGetUserPoints();
 
   const { wishlist } = useWishlist(phone);
   const { data: allProperties, isLoading: propertiesLoading } =
@@ -141,6 +145,7 @@ function StudentProfileInner() {
 
   const bookingCount = bookings?.length ?? 0;
   const alertCount = alerts.length;
+  const pointsNum = Number(points ?? 0n);
 
   const handleCancelVisit = async (bookingId: bigint) => {
     try {
@@ -261,7 +266,8 @@ function StudentProfileInner() {
 
         {/* ── Overview Tab ── */}
         <TabsContent value="overview">
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          {/* Stats grid: 4 cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
             <Card className="shadow-xs">
               <CardContent className="pt-5 pb-4 text-center">
                 <p className="text-3xl font-bold text-primary">
@@ -290,6 +296,48 @@ function StudentProfileInner() {
                 </p>
               </CardContent>
             </Card>
+            <Card className="shadow-xs">
+              <CardContent className="pt-5 pb-4 text-center">
+                <p className="text-3xl font-bold text-purple-600">
+                  {pointsNum}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Reward Points
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Referral & Rewards quick actions */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <button
+              type="button"
+              className="bg-card border border-border rounded-xl p-5 text-left hover:border-primary transition-colors cursor-pointer"
+              onClick={() => router.navigate({ to: "/student/referral" })}
+              data-ocid="profile.referral.button"
+            >
+              <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center mb-3">
+                <Gift className="w-5 h-5 text-orange-600" />
+              </div>
+              <p className="font-semibold text-sm mb-0.5">Refer &amp; Earn</p>
+              <p className="text-xs text-muted-foreground">
+                Share your referral code, earn points
+              </p>
+            </button>
+            <button
+              type="button"
+              className="bg-card border border-border rounded-xl p-5 text-left hover:border-primary transition-colors cursor-pointer"
+              onClick={() => router.navigate({ to: "/student/rewards" })}
+              data-ocid="profile.rewards.button"
+            >
+              <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mb-3">
+                <Star className="w-5 h-5 text-purple-600" />
+              </div>
+              <p className="font-semibold text-sm mb-0.5">My Rewards</p>
+              <p className="text-xs text-muted-foreground">
+                Points balance &amp; payout requests
+              </p>
+            </button>
           </div>
 
           <Card className="shadow-xs">
@@ -389,7 +437,6 @@ function StudentProfileInner() {
                 const isRefundingThis =
                   cancelPaidMutation.isPending &&
                   confirmRefundId === booking.id.toString();
-
                 const showCancelConfirm =
                   confirmCancelId === booking.id.toString();
                 const showRefundConfirm =
@@ -418,9 +465,7 @@ function StudentProfileInner() {
                             {!isPaidBooking ? "Visit" : "Paid Booking"}
                           </Badge>
                           <Badge
-                            className={`text-xs border ${
-                              statusColors[booking.status] || ""
-                            }`}
+                            className={`text-xs border ${statusColors[booking.status] || ""}`}
                             variant="outline"
                           >
                             {booking.status}
@@ -467,7 +512,6 @@ function StudentProfileInner() {
                             Cancel
                           </Button>
                         )}
-
                         {isPaidBooking && isPending && !showCancelConfirm && (
                           <Button
                             variant="outline"
@@ -481,7 +525,6 @@ function StudentProfileInner() {
                             Cancel
                           </Button>
                         )}
-
                         {isPaidBooking &&
                           isPaid &&
                           !showRefundConfirm &&
@@ -495,8 +538,7 @@ function StudentProfileInner() {
                               }
                               data-ocid={`profile.bookings.delete_button.${i + 1}`}
                             >
-                              <RefreshCw className="w-3 h-3" />
-                              Cancel & Refund
+                              <RefreshCw className="w-3 h-3" /> Cancel & Refund
                             </Button>
                           )}
                       </div>
@@ -532,7 +574,6 @@ function StudentProfileInner() {
                         </div>
                       </div>
                     )}
-
                     {showRefundConfirm && (
                       <div className="mt-3 pt-3 border-t border-border flex items-center gap-3 bg-red-50/50 dark:bg-red-950/20 -mx-5 -mb-5 px-5 pb-4 rounded-b-xl">
                         <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />
@@ -558,7 +599,7 @@ function StudentProfileInner() {
                             disabled={isRefundingThis}
                             data-ocid={`profile.bookings.confirm_button.${i + 1}`}
                           >
-                            <RefreshCw className="w-3 h-3" />
+                            <RefreshCw className="w-3 h-3" />{" "}
                             {isRefundingThis ? "Processing..." : "Yes, Refund"}
                           </Button>
                         </div>
@@ -681,7 +722,6 @@ function StudentProfileInner() {
                 <Badge variant="secondary">{alerts.length}</Badge>
               )}
             </h3>
-
             {alerts.length === 0 ? (
               <div
                 className="bg-card border border-border rounded-xl p-10 text-center"
@@ -718,11 +758,7 @@ function StudentProfileInner() {
                         <p className="text-xs text-muted-foreground mt-1">
                           {new Date(alert.createdAt).toLocaleDateString(
                             "en-IN",
-                            {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            },
+                            { day: "numeric", month: "short", year: "numeric" },
                           )}
                         </p>
                       </div>
@@ -752,7 +788,6 @@ function StudentProfileInner() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-0">
-              {/* Dark Mode */}
               <div className="flex items-center justify-between py-4">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
@@ -776,10 +811,7 @@ function StudentProfileInner() {
                   data-ocid="profile.settings.dark_mode.switch"
                 />
               </div>
-
               <Separator />
-
-              {/* Notifications */}
               <div className="flex items-center justify-between py-4">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
@@ -801,10 +833,7 @@ function StudentProfileInner() {
                   data-ocid="profile.settings.notifications.switch"
                 />
               </div>
-
               <Separator />
-
-              {/* Language */}
               <div className="flex items-center justify-between py-4">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center">
@@ -819,10 +848,7 @@ function StudentProfileInner() {
                   Coming Soon
                 </Badge>
               </div>
-
               <Separator />
-
-              {/* Logout */}
               <div className="pt-4">
                 <AlertDialog>
                   <AlertDialogTrigger asChild>

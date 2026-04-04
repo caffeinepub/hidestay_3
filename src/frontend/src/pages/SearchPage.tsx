@@ -13,10 +13,7 @@ import { Slider } from "@/components/ui/slider";
 import { useSearch } from "@tanstack/react-router";
 import { Building2, Search, SlidersHorizontal } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Variant_apartment_sharedRoom_single,
-  Variant_boys_unisex_girls,
-} from "../backend";
+import { GenderType, PropertyType } from "../backend";
 import PropertyCard from "../components/PropertyCard";
 import { useAuth } from "../hooks/useAuth";
 import { useApprovedProperties } from "../hooks/useQueries";
@@ -189,19 +186,13 @@ export default function SearchPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem
-                    value={Variant_apartment_sharedRoom_single.apartment}
-                  >
+                  <SelectItem value={PropertyType.apartment}>
                     PG / Flat
                   </SelectItem>
-                  <SelectItem
-                    value={Variant_apartment_sharedRoom_single.sharedRoom}
-                  >
+                  <SelectItem value={PropertyType.sharedRoom}>
                     Shared Room
                   </SelectItem>
-                  <SelectItem
-                    value={Variant_apartment_sharedRoom_single.single}
-                  >
+                  <SelectItem value={PropertyType.single}>
                     Private Room
                   </SelectItem>
                 </SelectContent>
@@ -217,15 +208,9 @@ export default function SearchPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All</SelectItem>
-                  <SelectItem value={Variant_boys_unisex_girls.boys}>
-                    Boys
-                  </SelectItem>
-                  <SelectItem value={Variant_boys_unisex_girls.girls}>
-                    Girls
-                  </SelectItem>
-                  <SelectItem value={Variant_boys_unisex_girls.unisex}>
-                    Unisex
-                  </SelectItem>
+                  <SelectItem value={GenderType.boys}>Boys</SelectItem>
+                  <SelectItem value={GenderType.girls}>Girls</SelectItem>
+                  <SelectItem value={GenderType.unisex}>Unisex</SelectItem>
                 </SelectContent>
               </Select>
             </div>

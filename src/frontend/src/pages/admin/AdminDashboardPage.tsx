@@ -19,7 +19,9 @@ import {
   MessageSquare,
   Settings,
   ShieldCheck,
+  Tag,
   Users,
+  Wallet,
 } from "lucide-react";
 import RouteGuard from "../../components/RouteGuard";
 import {
@@ -248,6 +250,22 @@ function AdminDashboardInner() {
           data-ocid="admin.id_verification.button"
         >
           <ShieldCheck className="w-4 h-4 mr-2" /> ID Verification
+        </Button>
+        <Button
+          variant="outline"
+          className="h-14 text-sm"
+          onClick={() => router.navigate({ to: "/admin/coupons" })}
+          data-ocid="admin.coupons.button"
+        >
+          <Tag className="w-4 h-4 mr-2" /> Coupons
+        </Button>
+        <Button
+          variant="outline"
+          className="h-14 text-sm"
+          onClick={() => router.navigate({ to: "/admin/payouts" })}
+          data-ocid="admin.payouts.button"
+        >
+          <Wallet className="w-4 h-4 mr-2" /> Payouts
         </Button>
       </div>
 

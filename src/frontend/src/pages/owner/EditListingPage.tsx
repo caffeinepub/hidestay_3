@@ -13,11 +13,7 @@ import { useParams, useRouter } from "@tanstack/react-router";
 import { ChevronLeft, Loader2, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import {
-  ExternalBlob,
-  Variant_apartment_sharedRoom_single,
-  Variant_boys_unisex_girls,
-} from "../../backend";
+import { ExternalBlob, GenderType, PropertyType } from "../../backend";
 import RouteGuard from "../../components/RouteGuard";
 import { useProperty, useUpdateProperty } from "../../hooks/useQueries";
 
@@ -39,11 +35,10 @@ function EditListingInner() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [pricePerMonth, setPricePerMonth] = useState("");
-  const [roomType, setRoomType] = useState<Variant_apartment_sharedRoom_single>(
-    Variant_apartment_sharedRoom_single.single,
+  const [roomType, setRoomType] = useState<PropertyType>(PropertyType.single);
+  const [genderPreference, setGenderPreference] = useState<GenderType>(
+    GenderType.unisex,
   );
-  const [genderPreference, setGenderPreference] =
-    useState<Variant_boys_unisex_girls>(Variant_boys_unisex_girls.unisex);
   const [contactPhone, setContactPhone] = useState("");
   const [amenities, setAmenities] = useState<string[]>([]);
   const [amenityInput, setAmenityInput] = useState("");
@@ -63,9 +58,7 @@ function EditListingInner() {
       setDescription(property.description);
       setPricePerMonth(property.pricePerMonth.toString());
       setRoomType(property.roomType);
-      setGenderPreference(
-        property.genderPreference ?? Variant_boys_unisex_girls.unisex,
-      );
+      setGenderPreference(property.genderPreference ?? GenderType.unisex);
       setContactPhone(property.contactPhone ?? "");
       setAmenities(property.amenities);
       const date = new Date(Number(property.availableFrom / 1_000_000n));
@@ -198,27 +191,19 @@ function EditListingInner() {
               <Label>Room Type</Label>
               <Select
                 value={roomType}
-                onValueChange={(v) =>
-                  setRoomType(v as Variant_apartment_sharedRoom_single)
-                }
+                onValueChange={(v) => setRoomType(v as PropertyType)}
               >
                 <SelectTrigger data-ocid="edit_listing.roomtype.select">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem
-                    value={Variant_apartment_sharedRoom_single.single}
-                  >
+                  <SelectItem value={PropertyType.single}>
                     Private Room
                   </SelectItem>
-                  <SelectItem
-                    value={Variant_apartment_sharedRoom_single.sharedRoom}
-                  >
+                  <SelectItem value={PropertyType.sharedRoom}>
                     Shared Room
                   </SelectItem>
-                  <SelectItem
-                    value={Variant_apartment_sharedRoom_single.apartment}
-                  >
+                  <SelectItem value={PropertyType.apartment}>
                     PG / Flat
                   </SelectItem>
                 </SelectContent>
@@ -243,23 +228,15 @@ function EditListingInner() {
               <Label>Gender Preference *</Label>
               <Select
                 value={genderPreference}
-                onValueChange={(v) =>
-                  setGenderPreference(v as Variant_boys_unisex_girls)
-                }
+                onValueChange={(v) => setGenderPreference(v as GenderType)}
               >
                 <SelectTrigger data-ocid="edit_listing.gender.select">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={Variant_boys_unisex_girls.unisex}>
-                    Unisex
-                  </SelectItem>
-                  <SelectItem value={Variant_boys_unisex_girls.boys}>
-                    Boys Only
-                  </SelectItem>
-                  <SelectItem value={Variant_boys_unisex_girls.girls}>
-                    Girls Only
-                  </SelectItem>
+                  <SelectItem value={GenderType.unisex}>Unisex</SelectItem>
+                  <SelectItem value={GenderType.boys}>Boys Only</SelectItem>
+                  <SelectItem value={GenderType.girls}>Girls Only</SelectItem>
                 </SelectContent>
               </Select>
             </div>

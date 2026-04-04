@@ -18,10 +18,12 @@ import {
   CreditCard,
   Eye,
   Loader2,
+  Tag,
+  X,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import type { Booking } from "../backend";
+import type { Booking, Coupon } from "../backend";
 import { Variant_cancelled_pending_paid_rejected } from "../backend";
 import RouteGuard from "../components/RouteGuard";
 import { useAuth } from "../hooks/useAuth";
@@ -30,7 +32,9 @@ import {
   useBookProperty,
   useCallerProfile,
   useCreateCheckoutSession,
+  useMarkCouponUsed,
   useProperty,
+  useValidateCoupon,
 } from "../hooks/useQueries";
 
 type BookingType = "visit" | "paid";
@@ -66,6 +70,8 @@ function BookingPageInner() {
   const { data: profile } = useCallerProfile();
   const bookMutation = useBookProperty();
   const checkoutMutation = useCreateCheckoutSession();
+  const validateCouponMutation = useValidateCoupon();
+  const useCouponMutation = useMarkCouponUsed();
 
   const [step, setStep] = useState<Step>("choose");
   const [bookingType, setBookingType] = useState<BookingType>("visit");
@@ -79,15 +85,56 @@ function BookingPageInner() {
   );
   const [copied, setCopied] = useState(false);
 
+  // Coupon state
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+  const [couponError, setCouponError] = useState("");
+
   const advance = property
     ? Math.round(Number(property.pricePerMonth) * 0.1)
     : 0;
+
+  const discountAmount = appliedCoupon
+    ? Math.round((advance * Number(appliedCoupon.discountPercent)) / 100)
+    : 0;
+  const finalAmount = advance - discountAmount;
 
   const isPending = bookMutation.isPending || checkoutMutation.isPending;
 
   const handleSelectType = (type: BookingType) => {
     setBookingType(type);
     setStep("details");
+  };
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setCouponError("");
+    try {
+      const coupon = await validateCouponMutation.mutateAsync(
+        couponCode.trim().toUpperCase(),
+      );
+      if (!coupon) {
+        setCouponError(
+          "Invalid or expired coupon code. Please check and try again.",
+        );
+        setAppliedCoupon(null);
+      } else {
+        setAppliedCoupon(coupon);
+        setCouponError("");
+        toast.success(
+          `Coupon applied! Save ₹${Math.round((advance * Number(coupon.discountPercent)) / 100).toLocaleString("en-IN")}`,
+        );
+      }
+    } catch {
+      setCouponError("Failed to validate coupon. Please try again.");
+      setAppliedCoupon(null);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode("");
+    setCouponError("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -106,7 +153,7 @@ function BookingPageInner() {
       student: principal,
       startDate: dateNanos,
       endDate: dateNanos,
-      totalPrice: bookingType === "visit" ? 0n : BigInt(advance),
+      totalPrice: bookingType === "visit" ? 0n : BigInt(finalAmount),
       userDetails: {
         name,
         email: bookingType === "paid" ? email : notes ? `notes: ${notes}` : "",
@@ -127,15 +174,26 @@ function BookingPageInner() {
         });
         setStep("confirmed");
       } else {
+        // If coupon was applied, mark it as used before redirecting to Stripe
+        if (appliedCoupon) {
+          try {
+            await useCouponMutation.mutateAsync(appliedCoupon.code);
+          } catch {
+            // Proceed even if coupon marking fails
+          }
+        }
+
         const baseUrl = window.location.origin;
         const sessionUrl = await checkoutMutation.mutateAsync({
           items: [
             {
               productName: `Visit Advance – ${property.title}`,
-              productDescription: `10% advance booking for ${property.address.city}`,
+              productDescription: `10% advance booking for ${property.address.city}${
+                appliedCoupon ? " (coupon applied)" : ""
+              }`,
               currency: "inr",
               quantity: 1n,
-              priceInCents: BigInt(advance * 100),
+              priceInCents: BigInt(finalAmount * 100),
             },
           ],
           successUrl: `${baseUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}&bookingId=${bookingId.toString()}`,
@@ -458,6 +516,68 @@ function BookingPageInner() {
           </div>
         </div>
 
+        {/* Coupon code — paid booking only */}
+        {!isVisit && (
+          <div className="space-y-2">
+            <Label htmlFor="coupon">Promo Code (optional)</Label>
+            {appliedCoupon ? (
+              <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <Tag className="w-4 h-4 text-green-600 shrink-0" />
+                <div className="flex-1">
+                  <span className="font-mono font-bold text-green-700">
+                    {appliedCoupon.code}
+                  </span>
+                  <span className="text-sm text-green-600 ml-2">
+                    — {Number(appliedCoupon.discountPercent)}% off applied! Save
+                    ₹{discountAmount.toLocaleString("en-IN")}
+                  </span>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-destructive h-6 w-6 p-0"
+                  onClick={handleRemoveCoupon}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <Input
+                  id="coupon"
+                  placeholder="Enter coupon code"
+                  value={couponCode}
+                  onChange={(e) => {
+                    setCouponCode(e.target.value.toUpperCase());
+                    setCouponError("");
+                  }}
+                  className="font-mono uppercase"
+                  data-ocid="booking.coupon.input"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleApplyCoupon}
+                  disabled={
+                    !couponCode.trim() || validateCouponMutation.isPending
+                  }
+                  data-ocid="booking.coupon.apply.button"
+                >
+                  {validateCouponMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    "Apply"
+                  )}
+                </Button>
+              </div>
+            )}
+            {couponError && (
+              <p className="text-sm text-destructive">{couponError}</p>
+            )}
+          </div>
+        )}
+
         {/* Paid booking summary */}
         {!isVisit && property && (
           <div className="bg-accent/40 rounded-xl p-4 space-y-2">
@@ -470,8 +590,20 @@ function BookingPageInner() {
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Advance (10%)</span>
-              <span className="font-bold text-primary">
-                ₹{advance.toLocaleString("en-IN")}
+              <span>₹{advance.toLocaleString("en-IN")}</span>
+            </div>
+            {appliedCoupon && (
+              <div className="flex justify-between text-sm text-green-600">
+                <span>
+                  Coupon Discount ({Number(appliedCoupon.discountPercent)}%)
+                </span>
+                <span>-₹{discountAmount.toLocaleString("en-IN")}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-sm border-t border-border/50 pt-2 mt-1">
+              <span className="font-semibold">Amount to Pay</span>
+              <span className="font-bold text-primary text-base">
+                ₹{finalAmount.toLocaleString("en-IN")}
               </span>
             </div>
           </div>

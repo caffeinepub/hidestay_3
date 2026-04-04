@@ -7,6 +7,8 @@ import Runtime "mo:core/Runtime";
 import Principal "mo:core/Principal";
 import Iter "mo:core/Iter";
 import Set "mo:core/Set";
+import List "mo:core/List";
+import Option "mo:core/Option";
 
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
@@ -15,7 +17,6 @@ import OutCall "http-outcalls/outcall";
 import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
 import UserApproval "user-approval/approval";
-
 
 actor {
   // Mixin with role-based access control
@@ -61,15 +62,27 @@ actor {
     title : Text;
     description : Text;
     pricePerMonth : Nat;
-    roomType : { #single; #sharedRoom; #apartment };
+    roomType : PropertyType;
     amenities : [Text];
     photos : [Storage.ExternalBlob];
     approved : Bool;
     availableFrom : Time.Time;
     contactPhone : Text;
-    genderPreference : { #boys; #girls; #unisex };
+    genderPreference : GenderType;
     verified : Bool;
     viewCount : Nat;
+  };
+
+  public type PropertyType = {
+    #single;
+    #sharedRoom;
+    #apartment;
+  };
+
+  public type GenderType = {
+    #boys;
+    #girls;
+    #unisex;
   };
 
   // Should contain property listing
@@ -135,23 +148,6 @@ actor {
     timestamp : Time.Time;
   };
 
-  // Store user profiles, properties, bookings, wishlists, and reviews
-  let propertyList = Map.empty<Nat, Property>();
-  let bookingList = Map.empty<Nat, Booking>();
-  let profileList = Map.empty<Principal, UserProfile>();
-  let wishlistMap = Map.empty<Principal, [Nat]>();
-  let reviewMap = Map.empty<Nat, [Review]>();
-  let blockedUsers = Set.empty<Principal>();
-  let reportList = Map.empty<Nat, Report>();
-  let announcementList = Map.empty<Nat, Announcement>();
-  let propertyViewEvents = Map.empty<Nat, [PropertyViewEvent]>();
-  let dailyActiveUsers = Map.empty<Text, Set.Set<Principal>>();
-
-  var nextPropertyId = 0;
-  var nextBookingId = 0;
-  var nextReportId = 0;
-  var nextAnnouncementId = 0;
-
   // Inquiry type
   public type Inquiry = {
     id : Nat;
@@ -165,9 +161,6 @@ actor {
     message : Text;
   };
 
-  let inquiriesList = Map.empty<Nat, Inquiry>();
-  var nextInquiryId = 0;
-
   // Notification type
   public type Notification = {
     id : Nat;
@@ -178,7 +171,64 @@ actor {
     relatedInquiryId : ?Nat;
   };
 
+  // NEW: Payout Request type
+  public type PayoutRequest = {
+    id : Nat;
+    student : Principal;
+    pointsRequested : Nat;
+    status : { #pending; #approved; #rejected };
+    timestamp : Time.Time;
+    notes : ?Text;
+  };
+
+  // NEW: Coupon type
+  public type Coupon = {
+    id : Nat;
+    code : Text;
+    discountPercent : Nat;
+    isActive : Bool;
+    createdAt : Time.Time;
+    maxUses : Nat;
+    useCount : Nat;
+    createdBy : Principal;
+  };
+
+  // Store user profiles, properties, bookings, wishlists, and reviews
+  let propertyList = Map.empty<Nat, Property>();
+  let bookingList = Map.empty<Nat, Booking>();
+  let profileList = Map.empty<Principal, UserProfile>();
+  let wishlistMap = Map.empty<Principal, [Nat]>();
+  let reviewMap = Map.empty<Nat, [Review]>();
+  let blockedUsers = Set.empty<Principal>();
+  let reportList = Map.empty<Nat, Report>();
+  let announcementList = Map.empty<Nat, Announcement>();
+  let propertyViewEvents = Map.empty<Nat, [PropertyViewEvent]>();
+  let dailyActiveUsers = Map.empty<Text, Set.Set<Principal>>();
+  let inquiriesList = Map.empty<Nat, Inquiry>();
   let notificationsList = Map.empty<Nat, Notification>();
+
+  // NEW: Referral system storage
+  let referralCodeToOwner = Map.empty<Text, Principal>();
+  let userReferralCode = Map.empty<Principal, Text>();
+  let referralCount = Map.empty<Principal, Nat>();
+  let hasAppliedReferral = Set.empty<Principal>();
+
+  // NEW: Points/Rewards system storage
+  let pointsMap = Map.empty<Principal, Nat>();
+  let firstBookingDone = Set.empty<Principal>();
+  let payoutRequests = Map.empty<Nat, PayoutRequest>();
+  var nextPayoutId = 0;
+
+  // NEW: Coupon system storage
+  let couponMap = Map.empty<Text, Coupon>();
+  let usedCoupons = Set.empty<Text>();
+  var nextCouponId = 0;
+
+  var nextPropertyId = 0;
+  var nextBookingId = 0;
+  var nextReportId = 0;
+  var nextAnnouncementId = 0;
+  var nextInquiryId = 0;
   var nextNotificationId = 0;
 
   // Stripe integration
@@ -195,6 +245,13 @@ actor {
     let seconds = timestamp / 1_000_000_000;
     let days = seconds / 86400;
     days.toText();
+  };
+
+  // Helper function to generate referral code from principal
+  func generateReferralCode(principal : Principal) : Text {
+    let principalText = principal.toText();
+    let hash = Nat.fromNat32(principal.hash());
+    "REF" # hash.toText();
   };
 
   public query func isStripeConfigured() : async Bool {
@@ -524,6 +581,16 @@ actor {
       Runtime.trap("Unauthorized: Only users can save profiles");
     };
     profileList.add(caller, profile);
+
+    // NEW: Generate referral code when user saves profile (if not already generated)
+    switch (userReferralCode.get(caller)) {
+      case (null) {
+        let code = generateReferralCode(caller);
+        userReferralCode.add(caller, code);
+        referralCodeToOwner.add(code, caller);
+      };
+      case (?_) { /* Already has a code */ };
+    };
   };
 
   public query func transform(input : OutCall.TransformationInput) : async OutCall.TransformationOutput {
@@ -1193,5 +1260,324 @@ actor {
       };
     };
     "";
+  };
+
+  // ========== NEW: REFERRAL SYSTEM ==========
+
+  // Get or generate caller's referral code
+  public query ({ caller }) func getReferralCode() : async Text {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can get referral codes");
+    };
+
+    switch (userReferralCode.get(caller)) {
+      case (?code) { code };
+      case (null) {
+        // Generate code (will be saved when profile is saved)
+        generateReferralCode(caller);
+      };
+    };
+  };
+
+  // Apply a referral code (new user only, once)
+  public shared ({ caller }) func applyReferralCode(code : Text) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can apply referral codes");
+    };
+
+    // Check if user has already applied a referral code
+    if (hasAppliedReferral.contains(caller)) {
+      Runtime.trap("You have already applied a referral code");
+    };
+
+    // Find the referrer
+    let referrer = switch (referralCodeToOwner.get(code)) {
+      case (null) { Runtime.trap("Invalid referral code") };
+      case (?owner) { owner };
+    };
+
+    // Cannot refer yourself
+    if (referrer == caller) {
+      Runtime.trap("Cannot use your own referral code");
+    };
+
+    // Mark as applied
+    hasAppliedReferral.add(caller);
+
+    // Award 10 points to referrer
+    let currentPoints = switch (pointsMap.get(referrer)) {
+      case (null) { 0 };
+      case (?points) { points };
+    };
+    pointsMap.add(referrer, currentPoints + 10);
+
+    // Increment referral count
+    let currentCount = switch (referralCount.get(referrer)) {
+      case (null) { 0 };
+      case (?count) { count };
+    };
+    referralCount.add(referrer, currentCount + 1);
+  };
+
+  // ========== NEW: POINTS/REWARDS SYSTEM ==========
+
+  // Get caller's points balance
+  public query ({ caller }) func getUserPoints() : async Nat {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view points");
+    };
+
+    switch (pointsMap.get(caller)) {
+      case (null) { 0 };
+      case (?points) { points };
+    };
+  };
+
+  // Award first booking points (called when first paid booking happens)
+  public shared ({ caller }) func awardFirstBookingPoints(student : Principal) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can award first booking points");
+    };
+
+    // Check if already awarded
+    if (firstBookingDone.contains(student)) {
+      return; // Already awarded
+    };
+
+    // Mark as done
+    firstBookingDone.add(student);
+
+    // Award 10 points
+    let currentPoints = switch (pointsMap.get(student)) {
+      case (null) { 0 };
+      case (?points) { points };
+    };
+    pointsMap.add(student, currentPoints + 10);
+  };
+
+  // Request payout (student requests when >= 800 points)
+  public shared ({ caller }) func requestPayout(notes : ?Text) : async Nat {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can request payouts");
+    };
+
+    let currentPoints = switch (pointsMap.get(caller)) {
+      case (null) { 0 };
+      case (?points) { points };
+    };
+
+    if (currentPoints < 800) {
+      Runtime.trap("Insufficient points. Need at least 800 points to request payout");
+    };
+
+    // Deduct 800 points
+    pointsMap.add(caller, currentPoints - 800);
+
+    // Create payout request
+    let request : PayoutRequest = {
+      id = nextPayoutId;
+      student = caller;
+      pointsRequested = 800;
+      status = #pending;
+      timestamp = Time.now();
+      notes = notes;
+    };
+
+    payoutRequests.add(nextPayoutId, request);
+    let requestId = nextPayoutId;
+    nextPayoutId += 1;
+
+    requestId;
+  };
+
+  // Get all payout requests (admin only)
+  public query ({ caller }) func getPayoutRequests() : async [PayoutRequest] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can view payout requests");
+    };
+
+    payoutRequests.values().toArray();
+  };
+
+  // Approve payout request (admin only)
+  public shared ({ caller }) func approvePayoutRequest(requestId : Nat) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can approve payout requests");
+    };
+
+    let request = switch (payoutRequests.get(requestId)) {
+      case (null) { Runtime.trap("Payout request not found") };
+      case (?req) { req };
+    };
+
+    if (request.status != #pending) {
+      Runtime.trap("Only pending payout requests can be approved");
+    };
+
+    let updated : PayoutRequest = {
+      request with
+      status = #approved;
+    };
+
+    payoutRequests.add(requestId, updated);
+  };
+
+  // Reject payout request and restore points (admin only)
+  public shared ({ caller }) func rejectPayoutRequest(requestId : Nat) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can reject payout requests");
+    };
+
+    let request = switch (payoutRequests.get(requestId)) {
+      case (null) { Runtime.trap("Payout request not found") };
+      case (?req) { req };
+    };
+
+    if (request.status != #pending) {
+      Runtime.trap("Only pending payout requests can be rejected");
+    };
+
+    // Restore 800 points to student
+    let currentPoints = switch (pointsMap.get(request.student)) {
+      case (null) { 0 };
+      case (?points) { points };
+    };
+    pointsMap.add(request.student, currentPoints + 800);
+
+    // Mark as rejected
+    let updated : PayoutRequest = {
+      request with
+      status = #rejected;
+    };
+
+    payoutRequests.add(requestId, updated);
+  };
+
+  // ========== NEW: COUPON SYSTEM ==========
+
+  // Create coupon (admin only)
+  public shared ({ caller }) func createCoupon(code : Text, maxUses : Nat) : async Nat {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can create coupons");
+    };
+
+    // Check if code already exists
+    switch (couponMap.get(code)) {
+      case (?_) { Runtime.trap("Coupon code already exists") };
+      case (null) {};
+    };
+
+    let coupon : Coupon = {
+      id = nextCouponId;
+      code = code;
+      discountPercent = 10;
+      isActive = true;
+      createdAt = Time.now();
+      maxUses = maxUses;
+      useCount = 0;
+      createdBy = caller;
+    };
+
+    couponMap.add(code, coupon);
+    let couponId = nextCouponId;
+    nextCouponId += 1;
+
+    couponId;
+  };
+
+  // Get all coupons (admin only)
+  public query ({ caller }) func getCoupons() : async [Coupon] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can view all coupons");
+    };
+
+    couponMap.values().toArray();
+  };
+
+  // Validate coupon (query, returns coupon if valid for caller)
+  public query ({ caller }) func validateCoupon(code : Text) : async ?Coupon {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can validate coupons");
+    };
+
+    let coupon = switch (couponMap.get(code)) {
+      case (null) { return null };
+      case (?c) { c };
+    };
+
+    // Check if active
+    if (not coupon.isActive) {
+      return null;
+    };
+
+    // Check if max uses exceeded (0 = unlimited)
+    if (coupon.maxUses > 0 and coupon.useCount >= coupon.maxUses) {
+      return null;
+    };
+
+    // Check if caller has already used this coupon
+    let usageKey = caller.toText() # ":" # code;
+    if (usedCoupons.contains(usageKey)) {
+      return null;
+    };
+
+    ?coupon;
+  };
+
+  // Use coupon (marks as used by caller, increments use count)
+  public shared ({ caller }) func useCoupon(code : Text) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can use coupons");
+    };
+
+    let coupon = switch (couponMap.get(code)) {
+      case (null) { Runtime.trap("Coupon not found") };
+      case (?c) { c };
+    };
+
+    // Check if active
+    if (not coupon.isActive) {
+      Runtime.trap("Coupon is not active");
+    };
+
+    // Check if max uses exceeded
+    if (coupon.maxUses > 0 and coupon.useCount >= coupon.maxUses) {
+      Runtime.trap("Coupon has reached maximum uses");
+    };
+
+    // Check if caller has already used this coupon
+    let usageKey = caller.toText() # ":" # code;
+    if (usedCoupons.contains(usageKey)) {
+      Runtime.trap("You have already used this coupon");
+    };
+
+    // Mark as used
+    usedCoupons.add(usageKey);
+
+    // Increment use count
+    let updated : Coupon = {
+      coupon with
+      useCount = coupon.useCount + 1;
+    };
+    couponMap.add(code, updated);
+  };
+
+  // Deactivate coupon (admin only)
+  public shared ({ caller }) func deactivateCoupon(code : Text) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can deactivate coupons");
+    };
+
+    let coupon = switch (couponMap.get(code)) {
+      case (null) { Runtime.trap("Coupon not found") };
+      case (?c) { c };
+    };
+
+    let updated : Coupon = {
+      coupon with
+      isActive = false;
+    };
+
+    couponMap.add(code, updated);
   };
 };

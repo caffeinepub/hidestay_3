@@ -14,13 +14,6 @@ export class ExternalBlob {
     static fromBytes(blob: Uint8Array<ArrayBuffer>): ExternalBlob;
     withUploadProgress(onProgress: (percentage: number) => void): ExternalBlob;
 }
-export interface Review {
-    propertyId: bigint;
-    comment: string;
-    timestamp: Time;
-    student: Principal;
-    rating: bigint;
-}
 export interface Address {
     blocknumber: string;
     street: string;
@@ -49,19 +42,6 @@ export interface Report {
     actionTaken?: string;
     reason: string;
 }
-export interface http_header {
-    value: string;
-    name: string;
-}
-export interface http_request_result {
-    status: bigint;
-    body: Uint8Array;
-    headers: Array<http_header>;
-}
-export interface UserApprovalInfo {
-    status: ApprovalStatus;
-    principal: Principal;
-}
 export interface Property {
     id: bigint;
     title: string;
@@ -72,32 +52,17 @@ export interface Property {
     availableFrom: Time;
     viewCount: bigint;
     approved: boolean;
-    genderPreference: Variant_boys_unisex_girls;
+    genderPreference: GenderType;
     address: Address;
     pricePerMonth: bigint;
-    roomType: Variant_apartment_sharedRoom_single;
+    roomType: PropertyType;
     photos: Array<ExternalBlob>;
     coordinates: Coordinates;
     contactPhone: string;
 }
-export interface ShoppingItem {
-    productName: string;
-    currency: string;
-    quantity: bigint;
-    priceInCents: bigint;
-    productDescription: string;
-}
 export interface TransformationInput {
     context: Uint8Array;
     response: http_request_result;
-}
-export interface Notification {
-    id: bigint;
-    ownerPrincipal: Principal;
-    relatedInquiryId?: bigint;
-    isRead: boolean;
-    message: string;
-    timestamp: Time;
 }
 export interface Announcement {
     id: bigint;
@@ -106,6 +71,14 @@ export interface Announcement {
     createdAt: Time;
     isActive: boolean;
     message: string;
+}
+export interface PayoutRequest {
+    id: bigint;
+    status: Variant_pending_approved_rejected;
+    notes?: string;
+    timestamp: Time;
+    student: Principal;
+    pointsRequested: bigint;
 }
 export interface Booking {
     id: bigint;
@@ -139,6 +112,56 @@ export interface StripeConfiguration {
     allowedCountries: Array<string>;
     secretKey: string;
 }
+export interface Review {
+    propertyId: bigint;
+    comment: string;
+    timestamp: Time;
+    student: Principal;
+    rating: bigint;
+}
+export interface Coupon {
+    id: bigint;
+    useCount: bigint;
+    code: string;
+    createdAt: Time;
+    createdBy: Principal;
+    discountPercent: bigint;
+    isActive: boolean;
+    maxUses: bigint;
+}
+export interface http_header {
+    value: string;
+    name: string;
+}
+export interface http_request_result {
+    status: bigint;
+    body: Uint8Array;
+    headers: Array<http_header>;
+}
+export enum ApprovalStatus {
+    pending = "pending",
+    approved = "approved",
+    rejected = "rejected"
+}
+export interface UserApprovalInfo {
+    status: ApprovalStatus;
+    principal: Principal;
+}
+export interface ShoppingItem {
+    productName: string;
+    currency: string;
+    quantity: bigint;
+    priceInCents: bigint;
+    productDescription: string;
+}
+export interface Notification {
+    id: bigint;
+    ownerPrincipal: Principal;
+    relatedInquiryId?: bigint;
+    isRead: boolean;
+    message: string;
+    timestamp: Time;
+}
 export interface Inquiry {
     id: bigint;
     status: Variant_pending_rejected_accepted;
@@ -156,10 +179,15 @@ export interface UserProfile {
     email: string;
     phone: string;
 }
-export enum ApprovalStatus {
-    pending = "pending",
-    approved = "approved",
-    rejected = "rejected"
+export enum GenderType {
+    boys = "boys",
+    unisex = "unisex",
+    girls = "girls"
+}
+export enum PropertyType {
+    apartment = "apartment",
+    sharedRoom = "sharedRoom",
+    single = "single"
 }
 export enum UserRole {
     admin = "admin",
@@ -171,24 +199,19 @@ export enum Variant_admin_owner_student {
     owner = "owner",
     student = "student"
 }
-export enum Variant_apartment_sharedRoom_single {
-    apartment = "apartment",
-    sharedRoom = "sharedRoom",
-    single = "single"
-}
 export enum Variant_bookVisit_contactOwner {
     bookVisit = "bookVisit",
     contactOwner = "contactOwner"
-}
-export enum Variant_boys_unisex_girls {
-    boys = "boys",
-    unisex = "unisex",
-    girls = "girls"
 }
 export enum Variant_cancelled_pending_paid_rejected {
     cancelled = "cancelled",
     pending = "pending",
     paid = "paid",
+    rejected = "rejected"
+}
+export enum Variant_pending_approved_rejected {
+    pending = "pending",
+    approved = "approved",
     rejected = "rejected"
 }
 export enum Variant_pending_rejected_accepted {
@@ -208,19 +231,23 @@ export enum Variant_resolved_pending_dismissed {
 export interface backendInterface {
     addReview(propertyId: bigint, rating: bigint, comment: string): Promise<void>;
     addToWishlist(propertyId: bigint): Promise<void>;
+    applyReferralCode(code: string): Promise<void>;
+    approvePayoutRequest(requestId: bigint): Promise<void>;
     approveProperty(propertyId: bigint): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
+    awardFirstBookingPoints(student: Principal): Promise<void>;
     blockUser(user: Principal): Promise<void>;
     bookProperty(booking: Booking): Promise<void>;
     cancelBooking(bookingId: bigint): Promise<void>;
     cancelPaidBooking(bookingId: bigint): Promise<void>;
     confirmBooking(bookingId: bigint): Promise<void>;
     confirmStripeBooking(bookingId: bigint, sessionId: string): Promise<void>;
-    rejectBooking(bookingId: bigint): Promise<void>;
     createAnnouncement(title: string, message: string, expiresAt: Time | null): Promise<void>;
     createCheckoutSession(items: Array<ShoppingItem>, successUrl: string, cancelUrl: string): Promise<string>;
+    createCoupon(code: string, maxUses: bigint): Promise<bigint>;
     createInquiry(propertyId: bigint, studentName: string, studentPhone: string, inquiryType: Variant_bookVisit_contactOwner, message: string): Promise<void>;
     deactivateAnnouncement(announcementId: bigint): Promise<void>;
+    deactivateCoupon(code: string): Promise<void>;
     deleteProperty(propertyId: bigint): Promise<void>;
     deleteReview(propertyId: bigint, reviewer: Principal): Promise<void>;
     dismissReport(reportId: bigint): Promise<void>;
@@ -239,21 +266,25 @@ export interface backendInterface {
     getBookings(): Promise<Array<Booking>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
+    getCoupons(): Promise<Array<Coupon>>;
     getDailyActiveUserCounts(): Promise<Array<{
         date: string;
         count: bigint;
     }>>;
     getOwnerInquiries(): Promise<Array<Inquiry>>;
     getOwnerNotifications(): Promise<Array<Notification>>;
+    getPayoutRequests(): Promise<Array<PayoutRequest>>;
     getProperties(): Promise<Array<Property>>;
     getProperty(id: bigint): Promise<Property | null>;
     getPropertyBookings(propertyId: bigint): Promise<Array<Booking>>;
+    getReferralCode(): Promise<string>;
     getReports(): Promise<Array<Report>>;
     getReviews(propertyId: bigint): Promise<Array<Review>>;
     getStripePayments(): Promise<string>;
     getStripeSessionStatus(sessionId: string): Promise<StripeSessionStatus>;
     getUnreadNotificationCount(): Promise<bigint>;
     getUserBookings(user: Principal): Promise<Array<Booking>>;
+    getUserPoints(): Promise<bigint>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     getWishlist(): Promise<Array<bigint>>;
     isCallerAdmin(): Promise<boolean>;
@@ -264,8 +295,11 @@ export interface backendInterface {
     listProperty(property: Property): Promise<void>;
     markAllNotificationsRead(): Promise<void>;
     markNotificationRead(notificationId: bigint): Promise<void>;
+    rejectBooking(bookingId: bigint): Promise<void>;
+    rejectPayoutRequest(requestId: bigint): Promise<void>;
     removeFromWishlist(propertyId: bigint): Promise<void>;
     requestApproval(): Promise<void>;
+    requestPayout(notes: string | null): Promise<bigint>;
     resolveReport(reportId: bigint, actionTaken: string): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     setApproval(user: Principal, status: ApprovalStatus): Promise<void>;
@@ -277,5 +311,7 @@ export interface backendInterface {
     unblockUser(user: Principal): Promise<void>;
     updateInquiryStatus(inquiryId: bigint, status: Variant_rejected_accepted): Promise<void>;
     updateProperty(propertyId: bigint, property: Property): Promise<void>;
+    useCoupon(code: string): Promise<void>;
+    validateCoupon(code: string): Promise<Coupon | null>;
     verifyProperty(propertyId: bigint): Promise<void>;
 }
