@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import type { backendInterface } from "../backend";
 import { createActorWithConfig } from "../config";
 import { getSecretParameter } from "../utils/urlParams";
@@ -7,56 +7,40 @@ import { useInternetIdentity } from "./useInternetIdentity";
 
 const ACTOR_QUERY_KEY = "actor";
 
-// Module-level actor cache so mutations can access it outside React hooks
+// Module-level actor cache so getLatestActor/waitForActorReady can access it
+// without needing to be inside a React component.
 let _latestActor: backendInterface | null = null;
-let _actorReadyResolvers: Array<(actor: backendInterface) => void> = [];
+let _actorReadyListeners: Array<(actor: backendInterface) => void> = [];
 
-/**
- * Returns the latest actor synchronously, or null if not yet ready.
- * Used by mutations in useQueries.ts.
- */
 export function getLatestActor(): backendInterface | null {
   return _latestActor;
 }
 
-/**
- * Waits until the actor is ready (up to 10 seconds), then returns it.
- * Used by mutations in useQueries.ts to avoid race conditions on page load.
- */
 export async function waitForActorReady(
-  _getActor?: () => backendInterface | null,
+  getActor?: () => backendInterface | null,
+  timeoutMs = 8000,
 ): Promise<backendInterface> {
-  if (_latestActor) {
-    return _latestActor;
-  }
-  // Wait up to 10 seconds for actor to become available
-  return new Promise<backendInterface>((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      _actorReadyResolvers = _actorReadyResolvers.filter((r) => r !== resolve);
-      reject(new Error("Actor not ready after 10 seconds"));
-    }, 10_000);
+  const resolveActor = getActor ?? getLatestActor;
+  const current = resolveActor();
+  if (current) return current;
 
-    const wrappedResolve = (actor: backendInterface) => {
-      clearTimeout(timeout);
+  return new Promise<backendInterface>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      _actorReadyListeners = _actorReadyListeners.filter((l) => l !== listener);
+      reject(new Error("Actor not ready after timeout"));
+    }, timeoutMs);
+
+    const listener = (actor: backendInterface) => {
+      clearTimeout(timer);
       resolve(actor);
     };
-    _actorReadyResolvers.push(wrappedResolve);
+    _actorReadyListeners.push(listener);
   });
-}
-
-function notifyActorReady(actor: backendInterface) {
-  _latestActor = actor;
-  const resolvers = _actorReadyResolvers.splice(0);
-  for (const resolve of resolvers) {
-    resolve(actor);
-  }
 }
 
 export function useActor() {
   const { identity } = useInternetIdentity();
   const queryClient = useQueryClient();
-  const prevActorRef = useRef<backendInterface | null>(null);
-
   const actorQuery = useQuery<backendInterface>({
     queryKey: [ACTOR_QUERY_KEY, identity?.getPrincipal().toString()],
     queryFn: async () => {
@@ -65,6 +49,11 @@ export function useActor() {
       if (!isAuthenticated) {
         // Return anonymous actor if not authenticated
         const anonActor = await createActorWithConfig();
+        _latestActor = anonActor;
+        for (const l of _actorReadyListeners) {
+          l(anonActor);
+        }
+        _actorReadyListeners = [];
         return anonActor;
       }
 
@@ -77,24 +66,34 @@ export function useActor() {
       const actor = await createActorWithConfig(actorOptions);
       const adminToken = getSecretParameter("caffeineAdminToken") || "";
       await actor._initializeAccessControlWithSecret(adminToken);
+
+      // Update module-level cache and notify waiters
+      _latestActor = actor;
+      for (const l of _actorReadyListeners) {
+        l(actor);
+      }
+      _actorReadyListeners = [];
+
       return actor;
     },
     // Only refetch when identity changes
     staleTime: Number.POSITIVE_INFINITY,
+    // This will cause the actor to be recreated when the identity changes
     enabled: true,
   });
 
-  // Keep module-level cache in sync and notify any waiting mutations
+  // When the actor changes, invalidate dependent queries
   useEffect(() => {
-    if (actorQuery.data && actorQuery.data !== prevActorRef.current) {
-      prevActorRef.current = actorQuery.data;
-      notifyActorReady(actorQuery.data);
-      // Invalidate dependent queries when actor changes
+    if (actorQuery.data) {
       queryClient.invalidateQueries({
-        predicate: (query) => !query.queryKey.includes(ACTOR_QUERY_KEY),
+        predicate: (query) => {
+          return !query.queryKey.includes(ACTOR_QUERY_KEY);
+        },
       });
       queryClient.refetchQueries({
-        predicate: (query) => !query.queryKey.includes(ACTOR_QUERY_KEY),
+        predicate: (query) => {
+          return !query.queryKey.includes(ACTOR_QUERY_KEY);
+        },
       });
     }
   }, [actorQuery.data, queryClient]);
